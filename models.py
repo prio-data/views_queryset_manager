@@ -7,16 +7,19 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 class RemoteBases(enum.Enum):
-    transform="trf"
+    trf="trf"
     base="base"
 
 class RemoteLOAs(enum.Enum):
-    priogrid_month="pgm"
-    country_month = "cm"
+    priogrid_month="priogrid_month"
+    country_month = "country_month"
 
 class Theme(Base):
     __tablename__ = "theme"
     name = Column(String,primary_key=True)
+    
+    def path(self):
+        return "theme/"+self.name
 
 class Queryset(Base):
     __tablename__ = "queryset"
@@ -28,11 +31,19 @@ class Queryset(Base):
 
     op_roots = relationship("Op",cascade="all,delete")
 
-    def paths(self):
-        return [os.path.join(self.loa,op.get_path()) for op in self.op_roots]
+    def paths(self,year):
+        try:
+            loa = self.loa.value
+        except AttributeError:
+            loa = str(self.loa)
+        return [os.path.join(loa,op.get_path(),str(year)) for op in self.op_roots]
 
     def op_chains(self):
         return [op.get_chain() for op in self.op_roots]
+    
+    def path(self):
+        return "queryset/"+self.name
+
 
 class Op(Base):
     """
@@ -58,7 +69,7 @@ class Op(Base):
 
         components = [bp,self.path]
 
-        if self.base_path == "transform":
+        if self.base_path == RemoteBases.trf:
             if self.args is None:
                 a = "_"
             else:
