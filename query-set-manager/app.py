@@ -8,12 +8,20 @@ import pydantic
 import requests
 import models
 import db
-from actions import retrieve_data,link_ops,parse_command,deparse_op
+from actions import retrieve_data,link_ops
+
+class Operation(pydantic.BaseModel):
+    base: str
+    path: str
+    args: List[str]
+
+class OperationChain(pydantic.BaseModel):
+    steps: List[Operation]
 
 class Queryset(pydantic.BaseModel):
     name:Optional[str]=None
     loa:models.RemoteLOAs 
-    ops: List[str]
+    operations: List[OperationChain]
     theme_name: Optional[str]=None
 
 class Theme(pydantic.BaseModel):
@@ -55,7 +63,7 @@ def queryset_detail(_:fastapi.Request,queryset:str):
         return {
             "level_of_analysis": queryset.loa.value,
             "theme": queryset.theme.name if queryset.theme else None,
-            "op_commands": [deparse_op(op) for op in queryset.op_roots],
+            #"op_commands": [deparse_op(op) for op in queryset.op_roots],
             "op_paths": [op.get_path() for op in queryset.op_roots],
         }
 
@@ -81,10 +89,10 @@ def queryset_create(r:fastapi.Request,queryset:Queryset):
         return fastapi.Response("Name can not be none when POSTing",status_code=422)
 
     with closing(db.Session()) as sess:
-        operations = []
-        for op in queryset.ops:
-            chain_root = link_ops(parse_command(op))
-            operations.append(chain_root)
+        operation_roots = []
+        for chain in queryset.operations:
+            root = link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
+            operation_roots.append(root)
         
         if queryset.theme_name:
             theme = sess.query(Theme).get(queryset.theme_name)
@@ -96,7 +104,7 @@ def queryset_create(r:fastapi.Request,queryset:Queryset):
         stored_queryset = models.Queryset(
                 name = queryset.name,
                 loa = queryset.loa,
-                op_roots = operations,
+                op_roots = operation_roots,
                 theme = theme,
             )
         try:
