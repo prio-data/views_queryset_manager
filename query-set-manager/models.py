@@ -65,7 +65,8 @@ class Operation(Base):
 
     op_id = Column(Integer,primary_key=True)
     next_op_id = Column(Integer,ForeignKey(with_schema("op.op_id")))
-    next_op = relationship("Operation",backref="previous_op",remote_side=[op_id],cascade="all,delete")
+    next_op = relationship("Operation",backref="previous_op",
+            remote_side=[op_id],cascade="all,delete")
 
     def __str__(self):
         """
@@ -108,7 +109,7 @@ class Operation(Base):
         except AssertionError as ae:
             raise ValueError("Arguments must be a list of values") from ae
         try:
-            assert all([isinstance(a,(int,str)) for a in args])
+            assert all((isinstance(a,(int,str)) for a in args))
         except AssertionError as ae:
             raise ValueError("Arguments must be either str or int") from ae
         return args
