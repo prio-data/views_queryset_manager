@@ -44,7 +44,8 @@ def prime_queryset(queryset: models.Queryset)->bool:
 
     ready = True
     for path in queryset.paths():
-        response = requests.get(os.path.join(settings.SOURCE_URL,path)+"?touch=true")
+        url = os.path.join(settings.SOURCE_URL,path)+"?touch=true"
+        response = requests.get(url)
         if response.status_code == 202:
             ready &= False
         elif response.status_code == 200:
