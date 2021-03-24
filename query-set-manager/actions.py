@@ -1,45 +1,79 @@
 
-import sys
-from io import BytesIO
-from contextlib import closing
 import os
-from typing import List
+import logging
+from io import BytesIO
+from typing import List,Optional
+from datetime import date
 
 import pandas as pd
 import requests
-from sqlalchemy.exc import InvalidRequestError
+from requests.exceptions import HTTPError
 
-from models import Queryset,Operation,Theme
-from db import Session
-from env import env
+from models import Queryset,Operation
 import settings
-import logging
+import ops
 
-def retrieve_data(queryset:Queryset,year:int)->pd.DataFrame:
-    with closing(Session()) as sess:
-        dataset = None
-        for rootnode,path in zip(queryset.op_roots,queryset.paths(year=year)):
-            full_path = os.path.join(settings.ROUTER_URL,path)
-            logging.error(full_path)
-            r = requests.get(full_path)
+logger = logging.getLogger(__name__)
 
-            if r.status_code == 200:
-                data = pd.read_parquet(BytesIO(r.content))
-                if dataset is not None:
-                    dataset = dataset.join(data)
-                else:
-                    dataset = data
+class OperationPending(Exception):
+    pass
+
+def is_ready(queryset:Queryset)->bool:
+    """
+    Returns True if a queryset is ready (all touch-requests return 200),
+    or False if one or more return 202. Throws if a request returns anything
+    else.
+    """
+
+    ready = True
+    for path in queryset.paths():
+        response = requests.get(os.path.join(settings.SOURCE_URL,path)+"?touch=true")
+        if response.status_code == 202:
+            ready &= False
+        elif response.status_code == 200:
+            pass
+        else:
+            raise HTTPError(response=response)
+    return ready 
+
+def retrieve_data(queryset:Queryset,
+        start_date:Optional[date]=None,end_date:Optional[date]=None)->pd.DataFrame:
+
+    dataset = None
+    logger.info("Retrieving data for queryset %s",queryset.name)
+
+    for path in queryset.paths():
+        logger.debug("Fetching %s",path)
+        response = requests.get(os.path.join(settings.SOURCE_URL,path))
+
+        if response.status_code == 200:
+            try:
+                data = pd.read_parquet(BytesIO(response.content))
+            except OSError as ose:
+                logger.error("Failed to deserialize data from %s",path)
+                raise ose
+
+            if start_date or end_date:
+                data = ops.temp_subset(data,start_date,end_date)
+
+            if dataset is not None:
+                logger.info("Joining data with %s",path)
+                dataset = ops.join(dataset,data)
             else:
-                raise requests.HTTPError(response=r)
+                dataset = data
+        else:
+            raise requests.HTTPError(response=response)
 
-        return dataset
+    return dataset
 
-def link_ops(ops:List[Operation])->Operation:
-    ops.reverse()
-    prev = ops.pop()
+def link_ops(operations:List[Operation])->Operation:
+    # This is silly
+    operations.reverse()
+    prev = operations.pop()
     first = prev
-    ops.reverse()
-    for op in ops:
+    operations.reverse()
+
+    for op in operations:
         op.previous_op = [prev]
         prev = op
     return first

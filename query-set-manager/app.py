@@ -1,32 +1,27 @@
 import os
+import logging
 from typing import List,Optional
 import io
 from contextlib import closing
+from datetime import date
+
 from fastapi import Response
 import fastapi
 import pydantic
 import requests
+
 import models
+import schema
 import db
-from actions import retrieve_data,link_ops
+import actions
+import settings
 
-class Operation(pydantic.BaseModel):
-    base: str
-    path: str
-    args: List[str]
+try:
+    logging.basicConfig(level=getattr(logging,settings.LOG_LEVEL))
+except AttributeError:
+    pass
 
-class OperationChain(pydantic.BaseModel):
-    steps: List[Operation]
-
-class Queryset(pydantic.BaseModel):
-    name:Optional[str]=None
-    loa:models.RemoteLOAs 
-    operations: List[OperationChain]
-    theme_name: Optional[str]=None
-
-class Theme(pydantic.BaseModel):
-    name:str
-
+models.Base.metadata.create_all(db.engine)
 app = fastapi.FastAPI()
 
 def hyperlink(r:fastapi.Request,*rest):
@@ -34,22 +29,30 @@ def hyperlink(r:fastapi.Request,*rest):
     base = f"{url.scheme}://{url.hostname}:{url.port}"
     return os.path.join(base,*rest)
 
-@app.get("/data/{queryset}/{year}/")
-def queryset_data(queryset:str,year:int):
+@app.get("/data/{queryset_name}/")
+def queryset_data(queryset_name:str,
+        start_date:Optional[date]=None,end_date:Optional[date]=None):
     """
     Retrieve data corresponding to a queryset
     """
     with closing(db.Session()) as sess:
-        queryset = sess.query(models.Queryset).get(queryset)
+        queryset = sess.query(models.Queryset).get(queryset_name)
         if queryset is None:
             return Response(status_code=404)
+
+        ready = actions.is_ready(queryset) 
+
+        if not ready:
+            return Response("In progress",status_code=202)
+
         try:
-            data = retrieve_data(queryset,year)
+            data = actions.retrieve_data(queryset,start_date,end_date)
         except requests.HTTPError as e:
             return Response(e.response.content,status_code=e.response.status_code)
-        ff = io.BytesIO()
-        data.to_parquet(ff,compression="gzip")
-        return Response(ff.getvalue(),media_type="application/octet-stream")
+
+        bytes_buffer = io.BytesIO()
+        data.to_parquet(bytes_buffer,compression="gzip")
+        return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
 
 @app.get("/queryset/{queryset}/")
 def queryset_detail(_:fastapi.Request,queryset:str):
@@ -63,7 +66,6 @@ def queryset_detail(_:fastapi.Request,queryset:str):
         return {
             "level_of_analysis": queryset.loa.value,
             "theme": queryset.theme.name if queryset.theme else None,
-            #"op_commands": [deparse_op(op) for op in queryset.op_roots],
             "op_paths": [op.get_path() for op in queryset.op_roots],
         }
 
@@ -78,26 +80,21 @@ def queryset_list(r:fastapi.Request):
         return Response(str(links))
 
 @app.post("/queryset/")
-def queryset_create(r:fastapi.Request,queryset:Queryset):
+def queryset_create(r:fastapi.Request,queryset:schema.QuerysetPost):
     """
     Creates a new queryset
     """
 
-    try:
-        assert queryset.name is not None
-    except AssertionError:
-        return fastapi.Response("Name can not be none when POSTing",status_code=422)
-
     with closing(db.Session()) as sess:
         operation_roots = []
         for chain in queryset.operations:
-            root = link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
+            root = actions.link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
             operation_roots.append(root)
         
         if queryset.theme_name:
-            theme = sess.query(Theme).get(queryset.theme_name)
+            theme = sess.query(models.Theme).get(queryset.theme_name)
             if theme is None:
-                theme = Theme(name=queryset.theme_name)
+                theme = models.Theme(name=queryset.theme_name)
         else:
             theme = None
 
@@ -116,15 +113,10 @@ def queryset_create(r:fastapi.Request,queryset:Queryset):
         return Response(hyperlink(r,stored_queryset.path()),status_code=201)
 
 @app.put("/queryset/{queryset}/")
-def queryset_replace(r:fastapi.Request,queryset:str,new:Queryset):
+def queryset_replace(r:fastapi.Request,queryset:str,new: schema.QuerysetPut):
     """
     Replaces the queryset with the posted queryset
     """
-
-    try:
-        assert new.name is None
-    except AssertionError:
-        return fastapi.Response("Name must be none when PUTting",status_code=422)
 
     with closing(db.Session()) as sess:
         existing_qs = sess.query(models.Queryset).get(queryset)
@@ -134,9 +126,7 @@ def queryset_replace(r:fastapi.Request,queryset:str,new:Queryset):
             sess.delete(existing_qs)
             sess.commit()
 
-    new.name = queryset
-
-    return queryset_create(r,queryset=new)
+    return queryset_create(r,queryset=schema.QuerysetPost.from_put(new,name=queryset))
 
 @app.delete("/queryset/{queryset}/")
 def queryset_delete(queryset:str):
