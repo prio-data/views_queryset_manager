@@ -6,13 +6,13 @@ import requests
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from azure.appconfiguration import AzureAppConfigurationClient
-from environs import Env
+from environs import Env,EnvError
 env = Env()
 env.read_env()
 
 BASE_DATE = date(year=1979,month=12,day=1)
 
-PROD = env.bool("PRODUCTION",True)
+PROD = env.bool("PRODUCTION",False)
 
 # SECRETS ================================================
 
@@ -24,9 +24,13 @@ if PROD:
             )
     get_config = lambda k: config_client.get_configuration_setting(k).value
 else:
-    REST_ENV_URL = env.str("REST_ENV_URL")
-    get_secret = lambda k: requests.get(os.path.join(REST_ENV_URL,k)).content.decode()
-    get_config = get_secret
+    try:
+        REST_ENV_URL = env.str("REST_ENV_URL")
+        get_secret = lambda k: requests.get(os.path.join(REST_ENV_URL,k)).content.decode()
+        get_config = get_secret
+    except EnvError:
+        get_secret = lambda k: ""
+        get_config = lambda k: ""
 
 DB_USER=get_secret("db-user")
 DB_PASSWORD=get_secret("db-password")

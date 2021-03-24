@@ -8,13 +8,9 @@ from datetime import date
 from fastapi import Response
 import fastapi
 import pydantic
-import requests
+from requests import HTTPError
 
-import models
-import schema
-import db
-import actions
-import settings
+from . import crud,models,schema,db,remotes,settings
 
 try:
     logging.basicConfig(level=getattr(logging,settings.LOG_LEVEL))
@@ -35,20 +31,21 @@ def queryset_data(queryset_name:str,
     """
     Retrieve data corresponding to a queryset
     """
-    with closing(db.Session()) as sess:
-        queryset = sess.query(models.Queryset).get(queryset_name)
+    with closing(db.Session()) as session:
+        queryset = crud.get_queryset(session,queryset_name)
+
         if queryset is None:
             return Response(status_code=404)
 
-        ready = actions.is_ready(queryset) 
-
-        if not ready:
-            return Response("In progress",status_code=202)
-
         try:
-            data = actions.retrieve_data(queryset,start_date,end_date)
-        except requests.HTTPError as e:
-            return Response(e.response.content,status_code=e.response.status_code)
+            data = remotes.fetch_data_for_queryset(queryset,start_date,end_date)
+        except remotes.OperationPending:
+            return Response(status_code=202)
+        except HTTPError as httpe:
+            return Response(
+                    f"Proxied {httpe.response.content}",
+                    status_code=httpe.response.status_code
+                )
 
         bytes_buffer = io.BytesIO()
         data.to_parquet(bytes_buffer,compression="gzip")
@@ -88,7 +85,7 @@ def queryset_create(r:fastapi.Request,queryset:schema.QuerysetPost):
     with closing(db.Session()) as sess:
         operation_roots = []
         for chain in queryset.operations:
-            root = actions.link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
+            root = models.link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
             operation_roots.append(root)
         
         if queryset.theme_name:

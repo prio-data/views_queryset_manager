@@ -5,9 +5,9 @@ from typing import Optional
 
 from dateutil.relativedelta import relativedelta
 
-import requests
 import pandas as pd
-import settings
+
+from . import settings
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +51,13 @@ def join(*dataframes):
 
     return joined 
 
-def date_to_mid(from_date:Optional[date])->int:
+def date_from_base(from_date:Optional[date],base)->int:
     if from_date:
-        d = relativedelta(from_date,settings.BASE_DATE)
+        d = relativedelta(from_date,base)
         return d.months + (d.years * 12)
     else:
         return None
 
 def temp_subset(dataframe:pd.DataFrame,start_date:Optional[date],end_date:Optional[date]):
-    if start_date:
-        logger.debug("Subsetting dataframe from %s", start_date)
-    if end_date:
-        logger.debug("Subsetting dataframe to %s", end_date)
-    start,end = (date_to_mid(date) for date in (start_date,end_date))
+    start,end = (date_from_base(date,settings.BASE_DATE) for date in (start_date,end_date))
     return dataframe.loc[start:end,:]

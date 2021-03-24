@@ -1,25 +1,42 @@
-
+"""
+Operations that access remote services.
+"""
 import os
 import logging
+from typing import Optional
+
 from io import BytesIO
-from typing import List,Optional
 from datetime import date
 
 import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
-from models import Queryset,Operation
-import settings
-import ops
+from . import models,settings,ops
 
 logger = logging.getLogger(__name__)
 
 class OperationPending(Exception):
     pass
 
-def is_ready(queryset:Queryset)->bool:
+def fetch_data_for_queryset(queryset: models.Queryset,
+        start_date:Optional[date]=None,end_date:Optional[date]=None)->pd.DataFrame:
     """
+    Retrieves data corresponding to a queryset with subsetting, if it is ready (cached).
+    """
+
+    try:
+        assert prime_queryset(queryset)
+    except AssertionError(OperationPending) as ae:
+        raise OperationPending from ae
+
+    dataset = retrieve_data(queryset,start_date,end_date)
+    return dataset
+
+def prime_queryset(queryset: models.Queryset)->bool:
+    """
+    Primes a queryset, touching all resources needed for fullfilment.
+
     Returns True if a queryset is ready (all touch-requests return 200),
     or False if one or more return 202. Throws if a request returns anything
     else.
@@ -36,7 +53,7 @@ def is_ready(queryset:Queryset)->bool:
             raise HTTPError(response=response)
     return ready 
 
-def retrieve_data(queryset:Queryset,
+def retrieve_data(queryset: models.Queryset,
         start_date:Optional[date]=None,end_date:Optional[date]=None)->pd.DataFrame:
 
     dataset = None
@@ -59,21 +76,12 @@ def retrieve_data(queryset:Queryset,
             if dataset is not None:
                 logger.info("Joining data with %s",path)
                 dataset = ops.join(dataset,data)
+
             else:
                 dataset = data
+
         else:
             raise requests.HTTPError(response=response)
 
     return dataset
 
-def link_ops(operations:List[Operation])->Operation:
-    # This is silly
-    operations.reverse()
-    prev = operations.pop()
-    first = prev
-    operations.reverse()
-
-    for op in operations:
-        op.previous_op = [prev]
-        prev = op
-    return first

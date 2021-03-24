@@ -1,10 +1,11 @@
 import os
+from typing import List
 import enum
 from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship,validates
-import settings
-from schema import RemoteLOAs,RemoteBases
+
+from . import settings,schema
 
 Base = declarative_base()
 
@@ -21,7 +22,7 @@ class Theme(Base):
 class Queryset(Base):
     __tablename__ = "queryset"
     name = Column(String,primary_key=True)
-    loa = Column(Enum(RemoteLOAs),nullable=False)
+    loa = Column(Enum(schema.RemoteLOAs),nullable=False)
 
     theme_id = Column(String,ForeignKey("theme.name"))
     theme = relationship("Theme",backref="querysets")
@@ -47,7 +48,7 @@ class Operation(Base):
     """
     __tablename__ = "op"
 
-    base_path = Column(Enum(RemoteBases),nullable=False)
+    base_path = Column(Enum(schema.RemoteBases),nullable=False)
     path = Column(String,nullable=False)
     args = Column(JSON,)
 
@@ -117,3 +118,15 @@ class Operation(Base):
                 path=pydantic_model.path,
                 args=pydantic_model.args,
             )
+
+def link_ops(operations:List[Operation])->Operation:
+    # This is silly
+    operations.reverse()
+    prev = operations.pop()
+    first = prev
+    operations.reverse()
+
+    for op in operations:
+        op.previous_op = [prev]
+        prev = op
+    return first

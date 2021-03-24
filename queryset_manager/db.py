@@ -1,8 +1,7 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base
-import settings
+from . import settings
 
 """
 CONNECTION_STRING=("postgresql+psycopg2://"
