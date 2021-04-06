@@ -27,7 +27,7 @@ def fetch_data_for_queryset(queryset: models.Queryset,
 
     try:
         assert prime_queryset(queryset)
-    except AssertionError(OperationPending) as ae:
+    except AssertionError as ae:
         raise OperationPending from ae
 
     dataset = retrieve_data(queryset,start_date,end_date)

@@ -12,6 +12,9 @@ from requests import HTTPError
 
 from . import crud,models,schema,db,remotes,settings
 
+logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
+logger.setLevel(logging.WARNING)
+
 try:
     logging.basicConfig(level=getattr(logging,settings.config("LOG_LEVEL")))
 except AttributeError:
@@ -85,7 +88,7 @@ def queryset_create(r:fastapi.Request,queryset:schema.QuerysetPost):
     with closing(db.Session()) as sess:
         operation_roots = []
         for chain in queryset.operations:
-            root = models.link_ops([models.Operation.from_pydantic(op) for op in chain.steps])
+            root = models.link_ops([models.Operation.from_pydantic(op) for op in chain])
             operation_roots.append(root)
         
         if queryset.theme_name:

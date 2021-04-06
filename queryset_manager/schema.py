@@ -18,7 +18,7 @@ class Operation(BaseModel):
 
 class Queryset(BaseModel):
     loa: RemoteLOAs 
-    operations: List[Operation]
+    operations: List[List[Operation]]
     theme_name: Optional[str]=None
 
 class QuerysetPut(Queryset):
