@@ -16,12 +16,9 @@ class Operation(BaseModel):
     path: str
     args: List[str]
 
-class OperationChain(BaseModel):
-    steps: List[Operation]
-
 class Queryset(BaseModel):
     loa: RemoteLOAs 
-    operations: List[OperationChain]
+    operations: List[Operation]
     theme_name: Optional[str]=None
 
 class QuerysetPut(Queryset):

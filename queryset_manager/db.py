@@ -1,19 +1,22 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from . import settings
+from postgres_azure_certificate_auth import sec_con
+from .settings import config 
 
-"""
-CONNECTION_STRING=("postgresql+psycopg2://"
-        f"{settings.DB_USER}:{settings.DB_PASSWORD}"
-        f"@{settings.DB_HOST}/{settings.DB_NAME}?sslmode=require"
-    )
-"""
 
-CONNECTION_STRING = "sqlite:///db.sqlite"
+sec = {
+        "sslcert": config("SSL_CERT"),
+        "sslkey": config("SSL_KEY"),
+        "sslrootcert": config("SSL_ROOT_CERT"),
+    }
+con = {
+        "host": config("DB_HOST"),
+        "user": config("DB_USER"),
+    }
 
-engine = create_engine(
-        CONNECTION_STRING
-        )
+def get_con():
+    return sec_con(sec,con,dbname=config("DB_NAME"))
 
+engine = create_engine("postgresql://",creator=get_con)
 Session = sessionmaker(engine)

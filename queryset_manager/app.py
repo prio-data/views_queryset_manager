@@ -13,7 +13,7 @@ from requests import HTTPError
 from . import crud,models,schema,db,remotes,settings
 
 try:
-    logging.basicConfig(level=getattr(logging,settings.LOG_LEVEL))
+    logging.basicConfig(level=getattr(logging,settings.config("LOG_LEVEL")))
 except AttributeError:
     pass
 

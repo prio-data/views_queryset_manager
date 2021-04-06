@@ -4,12 +4,11 @@ from unittest import mock
 import re
 
 import httpretty
-
 from . import remotes,models
 
 @httpretty.httprettified
 class TestRemotes(unittest.TestCase):
-    @mock.patch("queryset_manager.settings.SOURCE_URL","http://src")
+    @mock.patch("queryset_manager.settings.config",lambda x: "http://src")
     def test_prime_queryset(self):
         httpretty.register_uri(httpretty.GET,
                 "http://src/priogrid_month/foo/bar/baz",

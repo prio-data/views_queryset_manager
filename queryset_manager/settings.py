@@ -1,44 +1,28 @@
-
-import os
+"""
+Required settings:
+* Env:
+    - KEY_VAULT_URL
+* Secrets:
+    - DB_USER
+    - DB_PASSWORD
+* Config:
+    - DB_HOST
+    - JOB_MANAGER_URL
+    - QUERYSET_DB_SCHEMA
+    - LOG_LEVEL
+"""
+import environs
 from datetime import date
+from fitin import views_config
 
-import requests
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
-from azure.appconfiguration import AzureAppConfigurationClient
-from environs import Env,EnvError
-env = Env()
+env = environs.Env()
 env.read_env()
 
-BASE_DATE = date(year=1979,month=12,day=1)
-
-PROD = env.bool("PRODUCTION",False)
-
-# SECRETS ================================================
-
-if PROD:
-    secret_client = SecretClient(env.str("KEY_VAULT_URL"),DefaultAzureCredential())
-    get_secret = lambda k: secret_client.get_secret(k).value
-    config_client = AzureAppConfigurationClient.from_connection_string(
-                get_secret("appconfig-connection-string")
-            )
-    get_config = lambda k: config_client.get_configuration_setting(k).value
+try:
+    env("TESTING")
+except environs.EnvError:
+    config = views_config(env.str("KEY_VAULT_URL"))
 else:
-    try:
-        REST_ENV_URL = env.str("REST_ENV_URL")
-        get_secret = lambda k: requests.get(os.path.join(REST_ENV_URL,k)).content.decode()
-        get_config = get_secret
-    except EnvError:
-        get_secret = lambda k: ""
-        get_config = lambda k: ""
+    config = lambda x: ""
 
-DB_USER=get_secret("db-user")
-DB_PASSWORD=get_secret("db-password")
-
-# CONFIGURATION ==========================================
-
-SOURCE_URL = get_config("job-manager-url")
-DB_NAME = get_config("base-db-name")
-DB_SCHEMA = get_config("queryset-schema")
-DB_HOST = get_config("db-host")
-LOG_LEVEL = get_config("log-level")
+BASE_DATE = date(year=1979,month=12,day=1)

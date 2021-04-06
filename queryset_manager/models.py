@@ -1,19 +1,19 @@
 import os
 from typing import List
-import enum
-from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON
+from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON,MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship,validates
 
 from . import settings,schema
 
-Base = declarative_base()
+metadata = MetaData(schema=settings.config("QUERYSET_SCHEMA"))
+Base = declarative_base(metadata=metadata)
 
-TABLE_ARGS = {"schema":settings.DB_SCHEMA}
-with_schema = lambda name: ".".join([settings.DB_SCHEMA,name])
+with_schema = lambda name: ".".join([settings.config("QUERYSET_SCHEMA"),name])
 
 class Theme(Base):
     __tablename__ = "theme"
+
     name = Column(String,primary_key=True)
     
     def path(self):
@@ -21,6 +21,7 @@ class Theme(Base):
 
 class Queryset(Base):
     __tablename__ = "queryset"
+
     name = Column(String,primary_key=True)
     loa = Column(Enum(schema.RemoteLOAs),nullable=False)
 

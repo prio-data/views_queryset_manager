@@ -44,7 +44,7 @@ def prime_queryset(queryset: models.Queryset)->bool:
 
     ready = True
     for path in queryset.paths():
-        url = os.path.join(settings.SOURCE_URL,path)+"?touch=true"
+        url = os.path.join(settings.config("SOURCE_URL"),path)+"?touch=true"
         response = requests.get(url)
         if response.status_code == 202:
             ready &= False
@@ -62,7 +62,7 @@ def retrieve_data(queryset: models.Queryset,
 
     for path in queryset.paths():
         logger.debug("Fetching %s",path)
-        response = requests.get(os.path.join(settings.SOURCE_URL,path))
+        response = requests.get(os.path.join(settings.config("SOURCE_URL"),path))
 
         if response.status_code == 200:
             try:
