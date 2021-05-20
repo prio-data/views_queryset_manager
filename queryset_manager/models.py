@@ -15,7 +15,7 @@ class Theme(Base):
     __tablename__ = "theme"
 
     name = Column(String,primary_key=True)
-    
+
     def path(self):
         return "theme/"+self.name
 
@@ -39,7 +39,7 @@ class Queryset(Base):
 
     def op_chains(self):
         return [op.get_chain() for op in self.op_roots]
-    
+
     def path(self):
         return "queryset/"+self.name
 
@@ -72,7 +72,7 @@ class Operation(Base):
         components = [bp,self.path]
 
         if self.args is None:
-            args = ["_"] 
+            args = ["_"]
         else:
             args = self.args
         components.append("_".join([str(a) for a in args]))
@@ -88,8 +88,7 @@ class Operation(Base):
         previous.append(self)
         if self.next_op:
             return self.next_op.get_chain(previous=previous)
-        else:
-            return previous
+        return previous
 
     def __repr__(self):
         return self.__str__()
