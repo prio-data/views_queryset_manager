@@ -1,5 +1,6 @@
 
 from sqlalchemy.orm import Session
+from toolz.functoolz import curry
 from . import models,schema
 
 def get_queryset(session:Session,name:str):
@@ -11,21 +12,31 @@ def create_queryset(session:Session, posted: schema.Queryset):
         root = models.link_ops([models.Operation.from_pydantic(op) for op in chain])
         operation_roots.append(root)
 
-    if posted.theme_name:
-        theme = session.query(models.Theme).get(posted.theme_name)
-        if theme is None:
-            theme = models.Theme(name=posted.theme_name)
-    else:
-        theme = None
+    themes = []
+    if posted.themes:
+        for theme_name in posted.themes:
+            theme = session.query(models.Theme).get(theme_name)
+            if theme is None:
+                theme = models.Theme(name=theme_name)
+            themes.append(theme)
 
     queryset = models.Queryset(
             name = posted.name,
             loa = posted.loa,
             op_roots = operation_roots,
-            theme = theme,
+            themes = themes,
         )
 
     session.add(queryset)
     session.commit()
 
     return queryset
+
+def get_or_create(kind, id_name, session, identifier):
+    o = session.query(kind).get(identifier)
+    if o is None:
+        o = kind(**{id_name: identifier})
+        session.add(o)
+    return o
+
+get_or_create_theme = curry(get_or_create, models.Theme, "name")

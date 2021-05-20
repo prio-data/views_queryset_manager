@@ -1,23 +1,34 @@
 import os
 from typing import List
-from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON,MetaData
+from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON,MetaData,Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship,validates
 
-from . import settings,schema
+from . import schema
 
-metadata = MetaData(schema=settings.config("QUERYSET_SCHEMA"))
+metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
-with_schema = lambda name: ".".join([settings.config("QUERYSET_SCHEMA"),name])
+querysets_themes = Table("querysets_themes", Base.metadata,
+        Column("theme_name", String, ForeignKey("theme.name")),
+        Column("queryset_name", String, ForeignKey("queryset.name"))
+    )
 
 class Theme(Base):
     __tablename__ = "theme"
 
     name = Column(String,primary_key=True)
 
+    querysets = relationship("Queryset", 
+            secondary = querysets_themes, 
+            back_populates = "themes"
+            )
+
     def path(self):
         return "theme/"+self.name
+
+    def __repr__(self):
+        return f"{self.name} ({len(self.querysets)} querysets)"
 
 class Queryset(Base):
     __tablename__ = "queryset"
@@ -25,10 +36,15 @@ class Queryset(Base):
     name = Column(String,primary_key=True)
     loa = Column(Enum(schema.RemoteLOAs),nullable=False)
 
-    theme_id = Column(String,ForeignKey("theme.name"))
-    theme = relationship("Theme",backref="querysets")
+    themes = relationship("Theme", 
+            secondary = querysets_themes, 
+            back_populates = "querysets",
+            )
 
-    op_roots = relationship("Operation",cascade="all,delete")
+    op_roots = relationship(
+            "Operation",
+            cascade="all,delete-orphan"
+            )
 
     def paths(self):
         try:
@@ -53,12 +69,16 @@ class Operation(Base):
     path = Column(String,nullable=False)
     args = Column(JSON,)
 
-    queryset_name = Column(String,ForeignKey("queryset.name"))
+    queryset_name = Column(String,ForeignKey("queryset.name"),nullable = False)
 
     op_id = Column(Integer,primary_key=True)
     next_op_id = Column(Integer,ForeignKey("op.op_id"))
-    next_op = relationship("Operation",backref="previous_op",
-            remote_side=[op_id],cascade="all,delete")
+    next_op = relationship(
+            "Operation",
+            backref = "previous_op",
+            remote_side = [op_id],
+            cascade = "all,delete"
+        )
 
     def __str__(self):
         """
@@ -114,9 +134,9 @@ class Operation(Base):
     @classmethod
     def from_pydantic(cls,pydantic_model):
         return cls(
-                base_path=pydantic_model.base,
-                path=pydantic_model.path,
-                args=pydantic_model.args,
+                base_path=pydantic_model.namespace,
+                path=pydantic_model.name,
+                args=pydantic_model.arguments,
             )
 
 def link_ops(operations:List[Operation])->Operation:

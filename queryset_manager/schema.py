@@ -12,14 +12,14 @@ class RemoteLOAs(enum.Enum):
     country_month = "country_month"
 
 class Operation(BaseModel):
-    base: str
-    path: str
-    args: List[str]
+    namespace: str
+    name: str
+    arguments: List[str]
 
 class Queryset(BaseModel):
     loa: RemoteLOAs
     operations: List[List[Operation]]
-    theme_name: Optional[str]=None
+    themes: List[str] = []
 
 class QuerysetPut(Queryset):
     pass
@@ -33,7 +33,7 @@ class QuerysetPost(Queryset):
             name = name,
             loa = put.loa.value,
             operations = put.operations,
-            theme_name = put.theme_name
+            themes = put.themes
         )
 
 class Theme(BaseModel):

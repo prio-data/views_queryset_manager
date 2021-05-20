@@ -18,7 +18,6 @@ try:
 except AttributeError:
     pass
 
-models.Base.metadata.create_all(db.engine)
 app = fastapi.FastAPI()
 
 def hyperlink(r:fastapi.Request,*rest):
@@ -70,7 +69,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
         return fastapi.Response(status_code=404)
     return {
         "level_of_analysis": queryset.loa.value,
-        "theme": queryset.theme.name if queryset.theme else None,
+        "themes": [theme.name for theme in queryset.themes],
         "op_paths": [op.get_path() for op in queryset.op_roots],
     }
 
@@ -104,13 +103,17 @@ def queryset_replace(
     """
 
     existing_qs = session.query(models.Queryset).get(queryset)
+
     if existing_qs is None:
         pass
     else:
         session.delete(existing_qs)
         session.commit()
 
-    return queryset_create(r, posted=schema.QuerysetPost.from_put(new,name=queryset))
+    return queryset_create(r, 
+            posted=schema.QuerysetPost.from_put(new,name=queryset), 
+            session = session
+        )
 
 @app.delete("/queryset/{queryset}/")
 def queryset_delete(queryset:str, session = Depends(get_session)):
@@ -132,30 +135,20 @@ def list_theme(r:fastapi.Request,theme:str, session = Depends(get_session)):
     theme = session.query(models.Theme).get(theme)
     if theme is None:
         return fastapi.Response("No such theme",status_code=404)
-    querysets = session.query(models.Queryset).filter(models.Queryset.theme == theme).all()
-    return [hyperlink(r,qs.path()) for qs in querysets]
+    return [hyperlink(r,qs.path()) for qs in theme.querysets]
 
-@app.patch("/theme/{theme}/{queryset}/")
-def theme_associate_queryset(theme:str,queryset:str, session = Depends(get_session)):
+@app.patch("/theme/{theme_name}/{queryset_name}/")
+def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depends(get_session)):
     """
     Associates the queryset with the theme, replacing its current association.
     """
-    qs = session.query(models.Queryset).get(queryset)
-
-    if qs.theme is not None:
-        if len(qs.theme.querysets) == 1:
-            session.delete(qs.theme)
-
-    if qs is not None:
-        stored_theme = session.query(models.Theme).get(theme)
-        if stored_theme is None:
-            stored_theme = models.Theme(name=theme)
-        qs.theme = stored_theme
-        session.add(stored_theme)
-        session.commit()
-        return Response(status_code=204)
-
-    return Response(f"Queryset {queryset} not found",status_code=404)
+    theme = crud.get_or_create_theme(session, theme_name)
+    queryset = session.query(models.Queryset).get(queryset_name)
+    if queryset is None:
+        return Response(f"No queryset named {queryset_name}", status_code=404)
+    queryset.themes.append(theme)
+    session.commit()
+    return Response(f"{queryset_name} associated with {theme_name}")
 
 @app.get("/theme/")
 def theme_list(r:fastapi.Request, session = Depends(get_session)):
