@@ -4,7 +4,7 @@ import string
 from datetime import date
 import pandas as pd
 import numpy as np
-from . import settings,ops
+from queryset_manager import ops
 
 class TestJoin(unittest.TestCase):
     def test_join(self):
@@ -36,7 +36,6 @@ class TestJoin(unittest.TestCase):
             self.assertEqual(ops.date_from_base(input_date,base),mid)
 
     def test_temp_subset(self):
-        self.assertEqual(settings.BASE_DATE,date(1979,12,1))
         a = pd.DataFrame(np.ones((100,9)))
         a.columns = list(string.ascii_letters[:9])
         a.index = pd.MultiIndex.from_product([range(100),range(1)])

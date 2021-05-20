@@ -27,5 +27,3 @@ else:
     config = lambda x: ""
 
 config = lru_cache(maxsize=None)(config)
-
-BASE_DATE = date(year=1979,month=12,day=1)

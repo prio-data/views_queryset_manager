@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 
-from . import settings
+from . import constants 
 
 logger = logging.getLogger(__name__)
 
@@ -59,5 +59,5 @@ def date_from_base(from_date:Optional[date],base)->int:
         return None
 
 def temp_subset(dataframe:pd.DataFrame,start_date:Optional[date],end_date:Optional[date]):
-    start,end = (date_from_base(date,settings.BASE_DATE) for date in (start_date,end_date))
+    start,end = (date_from_base(date,constants.BASE_DATE) for date in (start_date,end_date))
     return dataframe.loc[start:end,:]

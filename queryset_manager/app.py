@@ -32,6 +32,8 @@ def get_session():
     finally:
         sess.close()
 
+remotes = remotes.Remotes(source_url = settings.config("SOURCE_URL"))
+
 @app.get("/data/{queryset_name}/")
 def queryset_data(queryset_name:str,
         start_date:Optional[date]=None, end_date:Optional[date]=None,
