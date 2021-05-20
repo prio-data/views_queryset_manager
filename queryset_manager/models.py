@@ -120,13 +120,11 @@ class Operation(Base):
             )
 
 def link_ops(operations:List[Operation])->Operation:
-    # This is silly
-    operations.reverse()
-    prev = operations.pop()
-    first = prev
-    operations.reverse()
+    first,*operations = operations
 
+    prev = first
     for op in operations:
         op.previous_op = [prev]
         prev = op
+
     return first
