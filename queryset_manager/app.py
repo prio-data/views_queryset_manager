@@ -4,7 +4,8 @@ from typing import Optional
 import io
 from datetime import date
 
-from fastapi import Response,Depends
+from fastapi import Response, Depends
+from fastapi.responses import JSONResponse
 import fastapi
 from requests import HTTPError
 
@@ -33,6 +34,15 @@ def get_session():
         sess.close()
 
 remotes = remotes.Remotes(source_url = settings.config("SOURCE_URL"))
+
+@app.get("/")
+def handshake():
+    """
+    Returns information about the app, including which version of viewser it expects.
+    """
+    return JSONResponse({
+            "viewser_version": "1.1.0"
+        })
 
 @app.get("/data/{queryset_name}/")
 def queryset_data(queryset_name:str,
@@ -69,35 +79,37 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
     queryset = session.query(models.Queryset).get(queryset)
     if queryset is None:
         return fastapi.Response(status_code=404)
-    return {
-        "level_of_analysis": queryset.loa.value,
-        "themes": [theme.name for theme in queryset.themes],
-        "op_paths": [op.get_path() for op in queryset.op_roots],
-    }
+    return JSONResponse({
+                "name": queryset.name,
+                "description": queryset.description if queryset.description is not None else "",
+                "level_of_analysis": queryset.loa.value,
+                "themes": [theme.name for theme in queryset.themes],
+                "op_paths": [op.get_path() for op in queryset.op_roots],
+            })
 
 @app.get("/queryset/")
-def queryset_list(r:fastapi.Request, session = Depends(get_session)):
+def queryset_list(session = Depends(get_session)):
     """
     Lists all current querysets
     """
     querysets = session.query(models.Queryset).all()
-    links = [hyperlink(r,qs.path()) for qs in querysets]
-    return Response(str(links))
+
+    return JSONResponse({
+                "querysets":[queryset.name for queryset in querysets]
+            })
 
 @app.post("/queryset/")
-def queryset_create(
-        r:fastapi.Request,
-        posted: schema.QuerysetPost,
-        session = Depends(get_session)):
+def queryset_create(posted: schema.QuerysetPost, session = Depends(get_session)):
     """
     Creates a new queryset
     """
     queryset = crud.create_queryset(session,posted)
-    return Response(hyperlink(r,queryset.path()),status_code=201)
+    return JSONResponse({
+               "name":queryset.name
+           })
 
 @app.put("/queryset/{queryset}/")
 def queryset_replace(
-        r:fastapi.Request,
         queryset:str, new: schema.QuerysetPut,
         session = Depends(get_session)):
     """
@@ -112,8 +124,8 @@ def queryset_replace(
         session.delete(existing_qs)
         session.commit()
 
-    return queryset_create(r, 
-            posted=schema.QuerysetPost.from_put(new,name=queryset), 
+    return queryset_create(
+            posted = schema.QuerysetPost.from_put(new,name=queryset),
             session = session
         )
 
@@ -129,16 +141,6 @@ def queryset_delete(queryset:str, session = Depends(get_session)):
         return fastapi.Response(status_code=204)
     return fastapi.Response(status_code=404)
 
-@app.get("/theme/{theme}/")
-def list_theme(r:fastapi.Request,theme:str, session = Depends(get_session)):
-    """
-    Returns a list of the querysets with associated with the requested theme.
-    """
-    theme = session.query(models.Theme).get(theme)
-    if theme is None:
-        return fastapi.Response("No such theme",status_code=404)
-    return [hyperlink(r,qs.path()) for qs in theme.querysets]
-
 @app.patch("/theme/{theme_name}/{queryset_name}/")
 def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depends(get_session)):
     """
@@ -153,6 +155,22 @@ def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depend
     return Response(f"{queryset_name} associated with {theme_name}")
 
 @app.get("/theme/")
-def theme_list(r:fastapi.Request, session = Depends(get_session)):
+def theme_list(session = Depends(get_session)):
     themes = session.query(models.Theme).all()
-    return [hyperlink(r,th.path()) for th in themes]
+    return JSONResponse({
+            "querysets": [theme.name for theme in themes]
+        })
+
+@app.get("/theme/{theme}/")
+def theme_detail(theme:str, session = Depends(get_session)):
+    """
+    Returns a list of the querysets with associated with the requested theme.
+    """
+    theme = session.query(models.Theme).get(theme)
+    if theme is None:
+        return fastapi.Response("No such theme",status_code=404)
+    return JSONResponse({
+            "name": theme.name,
+            "description": theme.description if theme.description is not None else "",
+            "querysets": [qs.name for qs in theme.querysets]
+        })
