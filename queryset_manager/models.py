@@ -84,6 +84,13 @@ class Operation(Base):
             cascade = "all,delete"
         )
 
+    def dict(self):
+        return {
+            "namespace": str(self.base_path.value),
+            "name": self.path,
+            "arguments": self.args,
+            }
+
     def __str__(self):
         """
         Show operation as path

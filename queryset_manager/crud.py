@@ -2,6 +2,10 @@
 from sqlalchemy.orm import Session
 from toolz.functoolz import curry
 from . import models,schema
+from sqlalchemy.exc import IntegrityError
+
+class Exists(Exception):
+    pass
 
 def get_queryset(session:Session,name:str):
     return session.query(models.Queryset).get(name)
@@ -27,8 +31,12 @@ def create_queryset(session:Session, posted: schema.Queryset):
             themes = themes,
         )
 
-    session.add(queryset)
-    session.commit()
+    try:
+        session.add(queryset)
+        session.commit()
+    except IntegrityError as ie:
+        raise Exists from ie
+
 
     return queryset
 

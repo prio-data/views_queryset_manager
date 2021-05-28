@@ -84,7 +84,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
                 "description": queryset.description if queryset.description is not None else "",
                 "level_of_analysis": queryset.loa.value,
                 "themes": [theme.name for theme in queryset.themes],
-                "op_paths": [op.get_path() for op in queryset.op_roots],
+                "operations": [[op.dict() for op in root.get_chain()] for root in queryset.op_roots],
             })
 
 @app.get("/queryset/")
@@ -103,7 +103,10 @@ def queryset_create(posted: schema.QuerysetPost, session = Depends(get_session))
     """
     Creates a new queryset
     """
-    queryset = crud.create_queryset(session,posted)
+    try:
+        queryset = crud.create_queryset(session,posted)
+    except crud.Exists:
+        return Response(f"Queryset \"{posted.name}\" already exists", status_code=409)
     return JSONResponse({
                "name":queryset.name
            })
