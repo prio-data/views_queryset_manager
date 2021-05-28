@@ -20,6 +20,7 @@ class Queryset(BaseModel):
     loa: RemoteLOAs
     operations: List[List[Operation]]
     themes: List[str] = []
+    description: Optional[str]
 
 class QuerysetPut(Queryset):
     pass
@@ -37,4 +38,5 @@ class QuerysetPost(Queryset):
         )
 
 class Theme(BaseModel):
-    name:str
+    name: str
+    description: Optional[str]

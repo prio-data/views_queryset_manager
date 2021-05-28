@@ -19,8 +19,10 @@ class Theme(Base):
 
     name = Column(String,primary_key=True)
 
-    querysets = relationship("Queryset", 
-            secondary = querysets_themes, 
+    description = Column(String, nullable=True)
+
+    querysets = relationship("Queryset",
+            secondary = querysets_themes,
             back_populates = "themes"
             )
 
@@ -36,8 +38,10 @@ class Queryset(Base):
     name = Column(String,primary_key=True)
     loa = Column(Enum(schema.RemoteLOAs),nullable=False)
 
-    themes = relationship("Theme", 
-            secondary = querysets_themes, 
+    description = Column(String, nullable = True)
+
+    themes = relationship("Theme",
+            secondary = querysets_themes,
             back_populates = "querysets",
             )
 
