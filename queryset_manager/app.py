@@ -41,7 +41,7 @@ def handshake():
     Returns information about the app, including which version of viewser it expects.
     """
     return JSONResponse({
-            "viewser_version": "1.1.0"
+            "viewser_version": "2.0.0"
         })
 
 @app.get("/data/{queryset_name}/")
@@ -82,7 +82,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
     return JSONResponse({
                 "name": queryset.name,
                 "description": queryset.description if queryset.description is not None else "",
-                "level_of_analysis": queryset.loa.value,
+                "loa": queryset.loa.value,
                 "themes": [theme.name for theme in queryset.themes],
                 "operations": [[op.dict() for op in root.get_chain()] for root in queryset.op_roots],
             })
