@@ -13,13 +13,18 @@ class TestRemotes(unittest.TestCase):
     @httpretty.activate
     def test_prime_queryset(self):
         httpretty.register_uri(httpretty.GET,
-                "http://src/priogrid_month/foo/bar/baz",
+                "http://src/priogrid_month/trf/bar/baz",
                 status=202)
 
         test_queryset = models.Queryset(
                 name="My qs",
                 loa="priogrid_month",
-                op_roots = [models.Operation(base_path="foo",path="bar",args=["baz"])]
+                operation_roots = [
+                    models.Operation(
+                        namespace = models.RemoteNamespaces("trf"),
+                        name = "bar",
+                        arguments = ["baz"])
+                ]
             )
 
         self.assertFalse(remotes.prime_queryset(test_queryset))

@@ -65,8 +65,9 @@ class Api():
         logger.info("Retrieving data for queryset %s",queryset.name)
 
         for path in queryset.paths():
-            logger.debug("Fetching %s",path)
-            response = requests.get(os.path.join(self.source_url, path))
+            url = os.path.join(self.source_url, path)
+            logger.debug("Fetching %s",url)
+            response = requests.get(url)
 
             if response.status_code == 200:
                 try:
