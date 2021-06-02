@@ -4,7 +4,7 @@ import warnings
 import httpretty
 from queryset_manager import remotes, models
 
-remotes = remotes.Remotes(source_url = "http://src")
+remotes = remotes.Api(source_url = "http://src")
 
 class TestRemotes(unittest.TestCase):
     def setUp(self):

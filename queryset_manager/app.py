@@ -33,7 +33,7 @@ def get_session():
     finally:
         sess.close()
 
-remotes = remotes.Remotes(source_url = settings.config("SOURCE_URL"))
+remotes_api = remotes.Api(source_url = settings.config("SOURCE_URL"))
 
 @app.get("/")
 def handshake():
@@ -57,7 +57,7 @@ def queryset_data(queryset_name:str,
         return Response(status_code=404)
 
     try:
-        data = remotes.fetch_data_for_queryset(queryset,start_date,end_date)
+        data = remotes_api.fetch_data_for_queryset(queryset,start_date,end_date)
     except remotes.OperationPending:
         return Response(status_code=202)
     except HTTPError as httpe:

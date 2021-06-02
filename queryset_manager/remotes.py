@@ -16,10 +16,10 @@ from . import models, ops
 
 logger = logging.getLogger(__name__)
 
-class Remotes():
-    class OperationPending(Exception):
-        pass
+class OperationPending(Exception):
+    pass
 
+class Api():
     def __init__(self,source_url):
         self.source_url = source_url
 
