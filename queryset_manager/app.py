@@ -8,8 +8,9 @@ from fastapi import Response, Depends
 from fastapi.responses import JSONResponse
 import fastapi
 from requests import HTTPError
+import views_schema as schema
 
-from . import crud,models,schema,db,remotes,settings
+from . import crud,models,db,remotes,settings
 
 logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
 logger.setLevel(logging.WARNING)
@@ -79,13 +80,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
     queryset = session.query(models.Queryset).get(queryset)
     if queryset is None:
         return fastapi.Response(status_code=404)
-    return JSONResponse({
-                "name": queryset.name,
-                "description": queryset.description if queryset.description is not None else "",
-                "loa": queryset.loa.value,
-                "themes": [theme.name for theme in queryset.themes],
-                "operations": [[op.dict() for op in root.get_chain()] for root in queryset.op_roots],
-            })
+    return queryset.dict()
 
 @app.get("/queryset/")
 def queryset_list(session = Depends(get_session)):
@@ -99,7 +94,7 @@ def queryset_list(session = Depends(get_session)):
             })
 
 @app.post("/queryset/")
-def queryset_create(posted: schema.QuerysetPost, session = Depends(get_session)):
+def queryset_create(posted: schema.Queryset, session = Depends(get_session)):
     """
     Creates a new queryset
     """
@@ -111,9 +106,12 @@ def queryset_create(posted: schema.QuerysetPost, session = Depends(get_session))
                "name":queryset.name
            })
 
+class QuerysetPut(schema.Queryset):
+    name: Optional[str] = None
+
 @app.put("/queryset/{queryset}/")
 def queryset_replace(
-        queryset:str, new: schema.QuerysetPut,
+        queryset:str, new: QuerysetPut,
         session = Depends(get_session)):
     """
     Replaces the queryset with the posted queryset
@@ -128,7 +126,7 @@ def queryset_replace(
         session.commit()
 
     return queryset_create(
-            posted = schema.QuerysetPost.from_put(new,name=queryset),
+            posted = schema.Queryset(name = queryset, **new.dict()),
             session = session
         )
 
