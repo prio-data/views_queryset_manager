@@ -94,14 +94,25 @@ def queryset_list(session = Depends(get_session)):
             })
 
 @app.post("/queryset/")
-def queryset_create(posted: schema.Queryset, session = Depends(get_session)):
+def queryset_create(
+        posted: schema.Queryset,
+        overwrite: bool = False,
+        session = Depends(get_session)):
     """
     Creates a new queryset
     """
+    if overwrite:
+        try:
+            crud.delete_queryset(session, posted.name)
+        except crud.DoesNotExist:
+            pass
+
     try:
         queryset = crud.create_queryset(session,posted)
     except crud.Exists:
-        return Response(f"Queryset \"{posted.name}\" already exists", status_code=409)
+        return Response(
+                f"Queryset \"{posted.name}\" already exists, overwrite False",
+                status_code=409)
     return JSONResponse({
                "name":queryset.name
            })
@@ -116,19 +127,8 @@ def queryset_replace(
     """
     Replaces the queryset with the posted queryset
     """
-
-    existing_qs = session.query(models.Queryset).get(queryset)
-
-    if existing_qs is None:
-        pass
-    else:
-        session.delete(existing_qs)
-        session.commit()
-
-    return queryset_create(
-            posted = schema.Queryset(name = queryset, **new.dict()),
-            session = session
-        )
+    posted = schema.Queryset(name = queryset, **new.dict()),
+    return queryset_create(posted, overwrite = True, session = session)
 
 @app.delete("/queryset/{queryset}/")
 def queryset_delete(queryset:str, session = Depends(get_session)):
@@ -173,5 +173,6 @@ def theme_detail(theme:str, session = Depends(get_session)):
     return JSONResponse({
             "name": theme.name,
             "description": theme.description if theme.description is not None else "",
+
             "querysets": [qs.name for qs in theme.querysets]
         })
