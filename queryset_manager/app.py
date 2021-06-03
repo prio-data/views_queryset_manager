@@ -127,8 +127,8 @@ def queryset_replace(
     """
     Replaces the queryset with the posted queryset
     """
-    posted = schema.Queryset(name = queryset, **new.dict()),
-    return queryset_create(posted, overwrite = True, session = session)
+    new.name = queryset
+    return queryset_create(new, overwrite = True, session = session)
 
 @app.delete("/queryset/{queryset}/")
 def queryset_delete(queryset:str, session = Depends(get_session)):
