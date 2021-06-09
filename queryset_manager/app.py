@@ -49,7 +49,8 @@ def handshake():
         })
 
 @app.get("/data/{queryset_name}/")
-def queryset_data(queryset_name:str,
+def queryset_data(
+        queryset_name:str,
         start_date:Optional[date]=None, end_date:Optional[date]=None,
         session = Depends(get_session)):
     """
@@ -65,8 +66,9 @@ def queryset_data(queryset_name:str,
     except remotes.OperationPending:
         return Response(status_code=202)
     except HTTPError as httpe:
+        logger.critical(f"{httpe.response.url} returned {httpe.response.status_code}")
         return Response(
-                f"Proxied {httpe.response.content}",
+                f"Proxied {httpe.response.content.decode()}",
                 status_code=httpe.response.status_code
             )
 
