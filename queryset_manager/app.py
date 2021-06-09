@@ -12,8 +12,11 @@ import views_schema as schema
 
 from . import crud,models,db,remotes,settings
 
-logger = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
-logger.setLevel(logging.WARNING)
+(logging
+        .getLogger("azure.core.pipeline.policies.http_logging_policy")
+        .setLevel(logging.WARNING)
+        )
+logger = logging.getLogger(__name__)
 
 try:
     logging.basicConfig(level=getattr(logging,settings.config("LOG_LEVEL")))
