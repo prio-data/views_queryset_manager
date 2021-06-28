@@ -45,10 +45,10 @@ def handshake():
     Returns information about the app, including which version of viewser it expects.
     """
     return JSONResponse({
-            "viewser_version": "2.0.0"
+            "viewser_version": "3.0.0"
         })
 
-@app.get("/data/{queryset_name}/")
+@app.get("/data/{queryset_name}")
 def queryset_data(
         queryset_name:str,
         start_date:Optional[date]=None, end_date:Optional[date]=None,
@@ -76,7 +76,7 @@ def queryset_data(
     data.to_parquet(bytes_buffer,compression="gzip")
     return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
 
-@app.get("/queryset/{queryset}/")
+@app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
     """
     Get details about a queryset
@@ -87,7 +87,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
         return fastapi.Response(status_code=404)
     return queryset.dict()
 
-@app.get("/queryset/")
+@app.get("/querysets")
 def queryset_list(session = Depends(get_session)):
     """
     Lists all current querysets
@@ -98,7 +98,7 @@ def queryset_list(session = Depends(get_session)):
                 "querysets":[queryset.name for queryset in querysets]
             })
 
-@app.post("/queryset/")
+@app.post("/querysets")
 def queryset_create(
         posted: schema.Queryset,
         overwrite: bool = False,
@@ -125,7 +125,7 @@ def queryset_create(
 class QuerysetPut(schema.Queryset):
     name: Optional[str] = None
 
-@app.put("/queryset/{queryset}/")
+@app.put("/querysets/{queryset}")
 def queryset_replace(
         queryset:str, new: QuerysetPut,
         session = Depends(get_session)):
@@ -135,7 +135,7 @@ def queryset_replace(
     new.name = queryset
     return queryset_create(new, overwrite = True, session = session)
 
-@app.delete("/queryset/{queryset}/")
+@app.delete("/queryset/{queryset}")
 def queryset_delete(queryset:str, session = Depends(get_session)):
     """
     Deletes the target queryset (does not delete any data)
@@ -147,7 +147,7 @@ def queryset_delete(queryset:str, session = Depends(get_session)):
         return fastapi.Response(status_code=204)
     return fastapi.Response(status_code=404)
 
-@app.patch("/theme/{theme_name}/{queryset_name}/")
+@app.patch("/themes/{theme_name}/{queryset_name}")
 def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depends(get_session)):
     """
     Associates the queryset with the theme, replacing its current association.
@@ -160,14 +160,14 @@ def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depend
     session.commit()
     return Response(f"{queryset_name} associated with {theme_name}")
 
-@app.get("/theme/")
+@app.get("/themes")
 def theme_list(session = Depends(get_session)):
     themes = session.query(models.Theme).all()
     return JSONResponse({
             "querysets": [theme.name for theme in themes]
         })
 
-@app.get("/theme/{theme}/")
+@app.get("/themes/{theme}")
 def theme_detail(theme:str, session = Depends(get_session)):
     """
     Returns a list of the querysets with associated with the requested theme.

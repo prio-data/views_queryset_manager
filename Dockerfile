@@ -13,4 +13,4 @@ ENV PRODUCTION=1
 COPY --from=fetch-cert /root.crt /.postgresql/root.crt
 
 COPY ./queryset_manager/ /queryset_manager
-CMD ["gunicorn","-k","uvicorn.workers.UvicornWorker","--bind","0.0.0.0:80","queryset_manager.app:app"]
+CMD ["gunicorn","--forwarded-allow-ips","*","-k","uvicorn.workers.UvicornWorker","--bind","0.0.0.0:80","queryset_manager.app:app"]
