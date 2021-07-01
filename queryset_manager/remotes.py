@@ -4,7 +4,6 @@ Operations that access remote services.
 import os
 import logging
 from typing import Optional
-
 from io import BytesIO
 from datetime import date
 

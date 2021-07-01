@@ -7,3 +7,4 @@ venv/
 .env
 *.sqlite
 testing/
+live_test*

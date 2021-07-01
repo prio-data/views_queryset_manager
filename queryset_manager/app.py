@@ -10,7 +10,7 @@ import fastapi
 from requests import HTTPError
 import views_schema as schema
 
-from . import crud,models,db,remotes,settings
+from . import crud,models,db,remotes,settings,retrieval
 
 (logging
         .getLogger("azure.core.pipeline.policies.http_logging_policy")
@@ -49,7 +49,7 @@ def handshake():
         })
 
 @app.get("/data/{queryset_name}")
-def queryset_data(
+async def queryset_data(
         queryset_name:str,
         start_date:Optional[date]=None, end_date:Optional[date]=None,
         session = Depends(get_session)):
@@ -62,7 +62,8 @@ def queryset_data(
         return Response(status_code=404)
 
     try:
-        data = remotes_api.fetch_data_for_queryset(queryset,start_date,end_date)
+        data = await retrieval.fetch_set(remotes_api.source_url, queryset)
+        #data = remotes_api.fetch_data_for_queryset(queryset,start_date,end_date)
     except remotes.OperationPending:
         return Response(status_code=202)
     except HTTPError as httpe:
