@@ -10,7 +10,7 @@ import fastapi
 from requests import HTTPError
 import views_schema as schema
 
-from . import crud,models,db,remotes,settings,retrieval
+from . import crud,models,db,remotes,settings,retrieval,compatibility
 
 (logging
         .getLogger("azure.core.pipeline.policies.http_logging_policy")
@@ -63,7 +63,6 @@ async def queryset_data(
 
     try:
         data = await retrieval.fetch_set(remotes_api.source_url, queryset)
-        #data = remotes_api.fetch_data_for_queryset(queryset,start_date,end_date)
     except remotes.OperationPending:
         return Response(status_code=202)
     except HTTPError as httpe:
@@ -72,6 +71,8 @@ async def queryset_data(
                 f"Proxied {httpe.response.content.decode()}",
                 status_code=httpe.response.status_code
             )
+
+    data = compatibility.with_index_names(data, queryset.loa) 
 
     bytes_buffer = io.BytesIO()
     data.to_parquet(bytes_buffer,compression="gzip")
