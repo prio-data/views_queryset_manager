@@ -62,7 +62,9 @@ async def queryset_data(
         return Response(status_code=404)
 
     try:
-        data = await retrieval.fetch_set(remotes_api.source_url, queryset)
+        data,exception = await retrieval.fetch_set(remotes_api.source_url, queryset)
+        if exception is not None:
+            raise exception
     except remotes.OperationPending:
         return Response(status_code=202)
     except HTTPError as httpe:
@@ -71,8 +73,13 @@ async def queryset_data(
                 f"Proxied {httpe.response.content.decode()}",
                 status_code=httpe.response.status_code
             )
+    except retrieval.DeserializationError as te:
+        return Response(
+                str(te),
+                status_code = 500
+                )
 
-    data = compatibility.with_index_names(data, queryset.loa) 
+    data = compatibility.with_index_names(data, queryset.loa)
 
     bytes_buffer = io.BytesIO()
     data.to_parquet(bytes_buffer,compression="gzip")
