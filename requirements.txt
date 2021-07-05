@@ -19,3 +19,4 @@ toolz>=0.11.1
 views-schema==0.1.0
 aiohttp==3.7.4.post0
 fast-views~=0.1.0
+PyMonad==2.4.0

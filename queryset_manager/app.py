@@ -1,12 +1,13 @@
 import os
 import logging
-from typing import Optional
+from typing import Optional, List
 import io
 from datetime import date
 
 from fastapi import Response, Depends
 from fastapi.responses import JSONResponse
 import fastapi
+import pandas as pd
 from requests import HTTPError
 import views_schema as schema
 
@@ -61,29 +62,22 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    try:
-        data,exception = await retrieval.fetch_set(remotes_api.source_url, queryset)
-        if exception is not None:
-            raise exception
-    except remotes.OperationPending:
-        return Response(status_code=202)
-    except HTTPError as httpe:
-        logger.critical(f"{httpe.response.url} returned {httpe.response.status_code}")
-        return Response(
-                f"Proxied {httpe.response.content.decode()}",
-                status_code=httpe.response.status_code
-            )
-    except retrieval.DeserializationError as te:
-        return Response(
-                str(te),
-                status_code = 500
-                )
+    def make_error_response(errors: List[Exception]):
+        msg = "\n".join([str(e) for e in errors])
+        if {type(e) for e in errors} == {retrieval.Pending}:
+            status_code = 202
+        else:
+            status_code = max([e.status_code for e in errors])
+        return Response(msg, status_code)
 
-    data = compatibility.with_index_names(data, queryset.loa)
+    def make_data_response(data: pd.DataFrame):
+        data = compatibility.with_index_names(data, queryset.loa)
+        bytes_buffer = io.BytesIO()
+        data.to_parquet(bytes_buffer,compression="gzip")
+        return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
 
-    bytes_buffer = io.BytesIO()
-    data.to_parquet(bytes_buffer,compression="gzip")
-    return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
+    result = await retrieval.fetch_set(remotes_api.source_url, queryset)
+    return result.either(make_error_response, make_data_response)
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
