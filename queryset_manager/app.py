@@ -138,7 +138,7 @@ def queryset_replace(
     new.name = queryset
     return queryset_create(new, overwrite = True, session = session)
 
-@app.delete("/queryset/{queryset}")
+@app.delete("/querysets/{queryset}")
 def queryset_delete(queryset:str, session = Depends(get_session)):
     """
     Deletes the target queryset (does not delete any data)
