@@ -3,7 +3,7 @@ import logging
 import asyncio
 from io import BytesIO
 from pymonad.either import Right, Left, Either
-from toolz.functoolz import compose, curry
+from toolz.functoolz import compose, curry, reduce
 import aiohttp
 import fast_views
 import pandas as pd
@@ -27,6 +27,20 @@ class DeserializationError(Exception):
 class Pending(Exception):
     def __init__(self,url):
         super().__init__(f"{url} is pending")
+
+def distinguish_string(by, existing, new):
+    if new in existing:
+        return distinguish_string(by, existing, by(new))
+    else:
+        return new
+
+def concat_distinct(by, existing, new):
+    return existing + [distinguish_string(by, existing, new)]
+
+distinct_names = lambda names: reduce(
+        curry(concat_distinct, lambda s: "_"+s),
+        names,
+        [])
 
 async def get(session: aiohttp.ClientSession, url: str)->Either:
     async with session.get(url) as response:
@@ -60,14 +74,13 @@ async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
                 *map(get_data, make_urls(base_url, queryset))
             )
 
-    unpack_errors = compose(
-                curry(filter,lambda x: x is not None),
-                curry(map,lambda e: e.either(identity, lambda _: None))
-            )
-
-    errors = [*unpack_errors(results)]
-    if len(errors)>0:
+    errors = reduce(lambda a,b: a + b.either(list, lambda x: list()), results, [])
+    if errors:
         return Left(errors)
 
-    else:
-        return Right(fast_views.inner_join([res.value for res in results]))
+    results = [res.value for res in results]
+
+    for df,name in zip(results, distinct_names([res.columns[0] for res in results])):
+        df.columns = [name]
+
+    return Right(fast_views.inner_join(results))
