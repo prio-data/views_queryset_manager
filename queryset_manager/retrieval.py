@@ -26,6 +26,7 @@ class DeserializationError(Exception):
 
 class Pending(Exception):
     def __init__(self,url):
+        self.status_code = 202
         super().__init__(f"{url} is pending")
 
 def distinguish_string(by, existing, new):
