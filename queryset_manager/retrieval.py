@@ -74,7 +74,7 @@ async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
                 *map(get_data, make_urls(base_url, queryset))
             )
 
-    errors = reduce(lambda a,b: a + b.either(list, lambda x: list()), results, [])
+    errors = reduce(lambda a,b: a + b.either(lambda x: [x], lambda x: list()), results, [])
     if errors:
         return Left(errors)
 
