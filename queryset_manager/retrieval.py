@@ -1,4 +1,6 @@
 
+from typing import TypeVar, List, Any
+
 import logging
 import asyncio
 from io import BytesIO
@@ -12,6 +14,8 @@ from . import models
 identity = lambda x:x
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 class HTTPNotOk(Exception):
     def __init__(self, url, status_code, content):
@@ -29,6 +33,13 @@ class Pending(Exception):
         self.status_code = 202
         super().__init__(f"{url} is pending")
 
+def combine_either(left: bool, eithers):
+    extractors = (lambda x: list(), lambda x: [x])
+    extractors = extractors if not left else extractors[::-1]
+    return reduce(lambda a,b: a + b.either(*extractors), eithers, [])
+
+lefts, rights = (curry(combine_either, b) for b in (True, False))
+
 def distinguish_string(by, existing, new):
     if new in existing:
         return distinguish_string(by, existing, by(new))
@@ -42,6 +53,17 @@ distinct_names = lambda names: reduce(
         curry(concat_distinct, lambda s: "_"+s),
         names,
         [])
+
+def list_with_distinct_names(dfs: List[pd.DataFrame])-> List[pd.DataFrame]:
+
+    seen = []
+    for df in dfs:
+        seen_before = len(seen)
+        seen = distinct_names(seen + list(df.columns))
+        df.columns = seen[seen_before:]
+
+    return dfs
+
 
 async def get(session: aiohttp.ClientSession, url: str)->Either:
     async with session.get(url) as response:
@@ -75,13 +97,12 @@ async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
                 *map(get_data, make_urls(base_url, queryset))
             )
 
-    errors = reduce(lambda a,b: a + b.either(lambda x: [x], lambda x: list()), results, [])
+    errors = lefts(results)
     if errors:
         return Left(errors)
 
-    results = [res.value for res in results]
+    results: List[pd.DataFrame] = rights(results)
+    results = list_with_distinct_names(results)
+    df = fast_views.inner_join(results)
 
-    for df,name in zip(results, distinct_names([res.columns[0] for res in results])):
-        df.columns = [name]
-
-    return Right(fast_views.inner_join(results))
+    return Right(df)

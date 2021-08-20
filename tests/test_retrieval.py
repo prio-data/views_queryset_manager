@@ -50,5 +50,5 @@ class TestRetrieval(TestCase):
     @patch("queryset_manager.retrieval.get", test_success)
     def test_success(self):
         res = asyncio.run(retrieval.fetch_set("http://",MockQueryset(["foo"])))
+        self.assertTrue(res.is_right())
         self.assertIs(type(res.value), pd.DataFrame)
-        print(res.value)
