@@ -38,7 +38,9 @@ def get_session():
     finally:
         sess.close()
 
-remotes_api = remotes.Api(source_url = settings.config("SOURCE_URL"))
+remotes_api = remotes.Api(
+        source_url = os.path.join(settings.config("JOB_MANAGER_URL"),"job")
+        )
 
 @app.get("/")
 def handshake():
