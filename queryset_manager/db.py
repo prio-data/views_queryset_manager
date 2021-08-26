@@ -1,21 +1,18 @@
 
+import psycopg2
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from postgres_azure_certificate_auth import sec_con
-from .settings import config 
-
-sec = {
-        "sslcert": config("SSL_CERT"),
-        "sslkey": config("SSL_KEY"),
-        "sslrootcert": config("SSL_ROOT_CERT"),
-    }
-con = {
-        "host": config("DB_HOST"),
-        "user": config("DB_USER"),
-    }
+from .settings import config
 
 def get_con():
-    return sec_con(sec,con,dbname=config("QUERYSET_DB_NAME"))
+    return psycopg2.connect(
+            f"host={config('DB_HOST')} "
+            f"port={config('DB_PORT')} "
+            f"user={config('DB_USER')} "
+            f"dbname={config('DB_NAME')} "
+            f"sslmode=allow "
+        )
 
-engine = create_engine("postgresql://",creator=get_con)
+engine = create_engine("postgresql+psycopg2://", creator = get_con)
+
 Session = sessionmaker(engine)
