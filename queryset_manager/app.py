@@ -13,10 +13,6 @@ import views_schema as schema
 
 from . import crud,models,db,remotes,settings,retrieval,compatibility
 
-(logging
-        .getLogger("azure.core.pipeline.policies.http_logging_policy")
-        .setLevel(logging.WARNING)
-        )
 logger = logging.getLogger(__name__)
 
 try:
