@@ -7,3 +7,4 @@ either transform data, or point to a raw data source. Ops are chained together
 to form paths, that correspond to resources on the data router.
 
 Querysets can be CRUDed, and are organized into Themes.
+For information about how to contribute, see [contributing](https://www.github.com/prio-data/contributing).
