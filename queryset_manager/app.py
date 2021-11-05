@@ -55,10 +55,12 @@ async def queryset_data(
     """
     Retrieve data corresponding to a queryset
     """
-    queryset = crud.get_queryset(session,queryset_name)
 
-    if queryset is None:
+    queryset = crud.get_queryset(session,queryset_name)
+    if queryset.is_nothing():
         return Response(status_code=404)
+    else:
+        queryset = queryset.value
 
     def make_error_response(errors: List[Exception]):
         msg = "\n".join([str(e) for e in errors])
@@ -107,21 +109,25 @@ def queryset_create(
     """
     Creates a new queryset
     """
-    if overwrite:
-        try:
-            crud.delete_queryset(session, posted.name)
-        except crud.DoesNotExist:
-            pass
+    def error_response(exception: Exception)-> Response:
+        if isinstance(exception, crud.Exists):
+            status_code, message = 409, ""
+        elif isinstance(exception, ValueError):
+            status_code, message = 400, str(exception)
+        else:
+            status_code, message = 500, str(exception)
+        return Response(message, status_code = status_code)
 
-    try:
-        queryset = crud.create_queryset(session,posted)
-    except crud.Exists:
-        return Response(
-                f"Queryset \"{posted.name}\" already exists, overwrite False",
-                status_code=409)
-    return JSONResponse({
-               "name":queryset.name
-           })
+    def success_response(queryset: models.Queryset)-> Response:
+        return JSONResponse({"name": queryset.name}, status_code=204)
+
+    if overwrite:
+        (crud.delete_queryset(session, posted.name)
+                .maybe(None, lambda name: logger.debug("Overwriting %s", name))
+        )
+    return (crud.create_queryset(session, posted)
+        .either(error_response, success_response)
+        )
 
 class QuerysetPut(schema.Queryset):
     name: Optional[str] = None
@@ -154,6 +160,7 @@ def theme_associate_queryset(theme_name:str, queryset_name:str, session = Depend
     Associates the queryset with the theme, replacing its current association.
     """
     theme = crud.get_or_create_theme(session, theme_name)
+
     queryset = session.query(models.Queryset).get(queryset_name)
     if queryset is None:
         return Response(f"No queryset named {queryset_name}", status_code=404)
@@ -179,6 +186,5 @@ def theme_detail(theme:str, session = Depends(get_session)):
     return JSONResponse({
             "name": theme.name,
             "description": theme.description if theme.description is not None else "",
-
             "querysets": [qs.name for qs in theme.querysets]
         })

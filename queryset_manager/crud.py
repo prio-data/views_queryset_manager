@@ -1,10 +1,14 @@
 
 from typing import TypeVar
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.orm import Session
 from toolz.functoolz import curry
+from pymonad.either import Left, Right, Either
+from pymonad.maybe import Maybe, Just, Nothing
 import views_schema
 from . import models
+
+T = TypeVar("T")
 
 class Exists(Exception):
     pass
@@ -12,30 +16,37 @@ class Exists(Exception):
 class DoesNotExist(Exception):
     pass
 
-def get_queryset(session:Session,name:str) -> models.Queryset:
-    return session.query(models.Queryset).get(name)
+def get_queryset(session:Session,name:str) -> Maybe[models.Queryset]:
+    qs = session.query(models.Queryset).get(name)
+    return Just(qs) if qs is not None else Nothing
 
-def create_queryset(session:Session, posted: views_schema.Queryset) -> models.Queryset:
-    queryset = models.Queryset.from_pydantic(session, posted)
+def create_queryset(session:Session, posted: views_schema.Queryset) -> Either[Exception, models.Queryset]:
+    try:
+        queryset = models.Queryset.from_pydantic(session, posted)
+    except ValueError as ve:
+        return Left(ve)
+
     session.add(queryset)
 
     try:
         session.commit()
     except IntegrityError:
-        raise Exists
+        return Left(Exists)
+    except SQLAlchemyError as sqlerr:
+        return Left(sqlerr)
 
-    return queryset
+    return Right(queryset)
 
-def delete_queryset(session: Session, name: str) -> None:
+def delete_queryset(session: Session, name: str) -> Maybe[str]:
     qs = session.query(models.Queryset).get(name)
     if qs is not None:
         session.delete(qs)
         session.commit()
+        return Just(name)
     else:
-        raise DoesNotExist(f"Queryset {name} does not exist")
+        return Nothing
 
-ModelType = TypeVar("ModelType")
-def get_or_create(kind: ModelType, id_name: str, session: Session, identifier:str)-> ModelType:
+def get_or_create(kind: T, id_name: str, session: Session, identifier:str)-> T:
     o = session.query(kind).get(identifier)
     if o is None:
         o = kind(**{id_name: identifier})
