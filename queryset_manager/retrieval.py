@@ -5,6 +5,7 @@ import logging
 import asyncio
 from io import BytesIO
 from pymonad.either import Right, Left, Either
+from pymonad.promise import Promise
 from toolz.functoolz import compose, curry, reduce
 import aiohttp
 import fast_views
@@ -78,31 +79,29 @@ async def get(session: aiohttp.ClientSession, url: str)->Either:
 def make_urls(base_url: str, queryset):
     return [base_url + "/" + path for path in queryset.paths()]
 
-async def deserialize(request_result) -> pd.DataFrame:
-    request_result = await request_result
-    pd_from_bytes = lambda b: pd.read_parquet(BytesIO(b))
+def pd_from_bytes(data: bytes)-> Either[Exception, pd.DataFrame]:
     try:
-        return request_result.either(Left, lambda bytes: Right(pd_from_bytes(bytes)))
+        return Right(pd.read_parquet(BytesIO(data)))
     except OSError:
-        return Left(DeserializationError(request_result.either(str,str)))
+        return Left(DeserializationError(str(data)))
 
-async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
+async def fetch_set(base_url: str, queryset: models.Queryset)-> Promise:
+    def get_data(session, url):
+        return (Promise.apply(get).to_arguments(session,url)
+            .then(lambda m: m.then(pd_from_bytes)))
+
     async with aiohttp.ClientSession() as session:
-        get_data = compose(
-                deserialize,
-                curry(get,session),
-            )
-
         results = await asyncio.gather(
-                *map(get_data, make_urls(base_url, queryset))
+                *map(curry(get_data, session), make_urls(base_url, queryset))
             )
 
     errors = lefts(results)
+
     if errors:
-        return Left(errors)
+        return Promise(lambda resolve,reject: reject(errors))
 
     results: List[pd.DataFrame] = rights(results)
     results = list_with_distinct_names(results)
     df = fast_views.inner_join(results)
 
-    return Right(df)
+    return Promise(lambda resolve,reject: resolve(df))

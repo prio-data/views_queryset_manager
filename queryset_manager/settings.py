@@ -10,6 +10,9 @@ Required settings:
 """
 import environs
 
+
 env = environs.Env()
 env.read_env()
 config = env.str
+
+JOB_MANAGER_URL = env.str("JOB_MANAGER_URL")

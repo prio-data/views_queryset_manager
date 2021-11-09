@@ -4,7 +4,7 @@ code.  This functionality should ideally not be depended upon.
 """
 import pandas as pd
 
-def with_index_names(df: pd.DataFrame, loa: str)-> pd.DataFrame:
+def with_index_names(loa: str, df: pd.DataFrame)-> pd.DataFrame:
     """
     Legacy code expects named indices. This function just adds names to indices, with
     the default names being time - unit.

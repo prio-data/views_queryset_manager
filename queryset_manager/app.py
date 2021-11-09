@@ -11,7 +11,7 @@ import pandas as pd
 from requests import HTTPError
 import views_schema as schema
 
-from . import crud,models,db,remotes,settings,retrieval,compatibility
+from . import crud,models,db,remotes,settings,retrieval,compatibility, data_access_layer
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,9 @@ def get_session():
     finally:
         sess.close()
 
+def get_dal(session: Session = Depends(get_session)) -> data_access_layer.DataAccessLayer:
+    return data_access_layer.DataAccessLayer(session, settings.JOB_MANAGER_URL)
+
 remotes_api = remotes.Api(
         source_url = os.path.join(settings.config("JOB_MANAGER_URL"),"job")
         )
@@ -51,16 +54,10 @@ def handshake():
 async def queryset_data(
         queryset_name:str,
         start_date:Optional[date]=None, end_date:Optional[date]=None,
-        session = Depends(get_session)):
+        dal = Depends(get_dal)):
     """
     Retrieve data corresponding to a queryset
     """
-
-    queryset = crud.get_queryset(session,queryset_name)
-    if queryset.is_nothing():
-        return Response(status_code=404)
-    else:
-        queryset = queryset.value
 
     def make_error_response(errors: List[Exception]):
         msg = "\n".join([str(e) for e in errors])
@@ -71,12 +68,11 @@ async def queryset_data(
         return Response(msg, status_code)
 
     def make_data_response(data: pd.DataFrame):
-        data = compatibility.with_index_names(data, queryset.loa)
         bytes_buffer = io.BytesIO()
         data.to_parquet(bytes_buffer,compression="gzip")
         return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
 
-    result = await retrieval.fetch_set(remotes_api.source_url, queryset)
+    result = await dal.fetch(queryset_name, start_date, end_date)
     return result.either(make_error_response, make_data_response)
 
 @app.get("/querysets/{queryset}")
