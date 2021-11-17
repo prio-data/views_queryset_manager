@@ -15,4 +15,6 @@ def get_con():
 
 engine = create_engine("postgresql+psycopg2://", creator = get_con)
 
+cache_engine = create_engine("sqlite://")
+
 Session = sessionmaker(engine)

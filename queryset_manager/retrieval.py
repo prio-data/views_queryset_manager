@@ -4,6 +4,7 @@ from typing import TypeVar, List, Any
 import logging
 import asyncio
 from io import BytesIO
+import pyarrow
 from pymonad.either import Right, Left, Either
 from pymonad.promise import Promise
 from toolz.functoolz import compose, curry, reduce
@@ -66,15 +67,16 @@ def list_with_distinct_names(dfs: List[pd.DataFrame])-> List[pd.DataFrame]:
     return dfs
 
 
-async def get(session: aiohttp.ClientSession, url: str)->Either:
-    async with session.get(url) as response:
-        content = await response.content.read()
-        if (status := response.status) == 200:
-            return Right(content)
-        elif status == 202:
-            return Left(Pending(url))
-        else:
-            return Left(HTTPNotOk(url,status, content))
+async def get(url: str)->Either:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            content = await response.content.read()
+            if (status := response.status) == 200:
+                return Right(content)
+            elif status == 202:
+                return Left(Pending(url))
+            else:
+                return Left(HTTPNotOk(url,status, content))
 
 def make_urls(base_url: str, queryset):
     return [base_url + "/" + path for path in queryset.paths()]
@@ -82,26 +84,28 @@ def make_urls(base_url: str, queryset):
 def pd_from_bytes(data: bytes)-> Either[Exception, pd.DataFrame]:
     try:
         return Right(pd.read_parquet(BytesIO(data)))
-    except OSError:
+    except (OSError, pyarrow.lib.ArrowInvalid):
         return Left(DeserializationError(str(data)))
 
-async def fetch_set(base_url: str, queryset: models.Queryset)-> Promise:
-    def get_data(session, url):
-        return (Promise.apply(get).to_arguments(session,url)
-            .then(lambda m: m.then(pd_from_bytes)))
+async def fetch_set(base_url: str, queryset: models.Queryset)-> Either[List[Exception], pd.DataFrame]:
+    def get_data(url):
+        promise = (Promise
+                .insert(url)
+                .then(get)
+                .then(lambda m: m.then(pd_from_bytes))
+                .catch(Left))
+        return promise
 
-    async with aiohttp.ClientSession() as session:
-        results = await asyncio.gather(
-                *map(curry(get_data, session), make_urls(base_url, queryset))
-            )
+    results = await asyncio.gather(
+            *map(get_data, make_urls(base_url, queryset))
+        )
 
     errors = lefts(results)
 
     if errors:
-        return Promise(lambda resolve,reject: reject(errors))
+        return Left(errors)
 
     results: List[pd.DataFrame] = rights(results)
     results = list_with_distinct_names(results)
     df = fast_views.inner_join(results)
-
-    return Promise(lambda resolve,reject: resolve(df))
+    return Right(df)

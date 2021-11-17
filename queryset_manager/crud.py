@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from toolz.functoolz import curry
 from pymonad.either import Left, Right, Either
 from pymonad.maybe import Maybe, Just, Nothing
-from pymonad import Promise
+from pymonad.promise import Promise
 import views_schema
 from . import models
 
@@ -17,7 +17,7 @@ class Exists(Exception):
 class DoesNotExist(Exception):
     pass
 
-def get_queryset(session:Session,name:str) -> Promise[models.Queryset]:
+def get_queryset(session:Session,name:str) -> Promise:
     qs = session.query(models.Queryset).get(name)
     return Promise(lambda reject, resolve: resolve(qs) if qs is not None else reject(DoesNotExist))
 

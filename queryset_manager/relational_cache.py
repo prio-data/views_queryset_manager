@@ -54,7 +54,7 @@ class RelationalCache():
     def store(self, name: str, data: pd.DataFrame):
         with closing(self.con()) as con:
             data.to_sql(name, con, if_exists = "replace", index = True)
-            self._add_primary_keys(con, name, data)
+            #self._add_primary_keys(con, name, data)
 
         logger.warning("Cached %s", name)
         return data

@@ -34,7 +34,13 @@ def get_session():
     finally:
         sess.close()
 
-def get_dal(session: Session = Depends(get_session)) -> data_access_layer.DataAccessLayer:
+def get_cache():
+    return relational_cache.RelationalCache(db.cache_engine)
+
+def get_dal(
+        session: Session = Depends(get_session), 
+        cache: relational_cache.RelationalCache = Depends(get_cache)
+        ) -> data_access_layer.DataAccessLayer:
     return data_access_layer.DataAccessLayer(session, settings.JOB_MANAGER_URL)
 
 remotes_api = remotes.Api(

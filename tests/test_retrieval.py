@@ -17,13 +17,13 @@ class MockQueryset():
     def paths(self):
         return self._paths
 
-async def bad_request_500(_, __):
+async def bad_request_500(_):
     return Left(retrieval.HTTPNotOk("http://foobar", 500, "something went wrong"))
 
-async def bad_request_gibberish(_, __):
+async def bad_request_gibberish(_):
     return Right(b"abcdefg")
 
-async def test_success(_, __):
+async def test_success(_):
     data = pd.DataFrame(np.ones((9,9)))
     data.index = pd.MultiIndex.from_product(((1,2,3),(1,2,3)))
     data.columns = list(string.ascii_letters[:9])
