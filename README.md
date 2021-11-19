@@ -8,4 +8,21 @@ to form paths, that correspond to resources on the data router.
 
 Querysets can be CRUDed, and are organized into Themes.
 
+## Env settings
+
+|Key                                                          |Description                    |Default                      |
+|-------------------------------------------------------------|-------------------------------|-----------------------------|
+|DB_HOST                                                      |                               |                             |
+|DB_PORT                                                      |                               |                             |
+|DB_USER                                                      |                               |                             |
+|DB_NAME                                                      |                               |                             |
+|LOG_LEVEL                                                    |                               |                             |
+|JOB_MANAGER_URL                                              |                               |                             |
+
+## Depends on 
+
+* [views_job_manager](https://github.com/prio-data/views_job_manager)
+
+## Contributing
+
 For information about how to contribute, see [contributing](https://www.github.com/prio-data/contributing).
