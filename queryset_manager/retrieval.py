@@ -7,7 +7,7 @@ from io import BytesIO
 from pymonad.either import Right, Left, Either
 from toolz.functoolz import compose, curry, reduce
 import aiohttp
-import fast_views
+#import fast_views
 import pandas as pd
 from . import models
 
@@ -103,6 +103,7 @@ async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
 
     results: List[pd.DataFrame] = rights(results)
     results = list_with_distinct_names(results)
-    df = fast_views.inner_join(results)
+    df = reduce(lambda a,b: a.merge(b, left_index = True, right_index = True, how = "inner"), results)
+    #df = fast_views.inner_join(results)
 
     return Right(df)
