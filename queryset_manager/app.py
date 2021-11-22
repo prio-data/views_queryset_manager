@@ -69,7 +69,7 @@ async def queryset_data(
         return Response(msg, status_code)
 
     def make_data_response(data: pd.DataFrame):
-        data = compatibility.with_index_names(data, queryset.loa)
+        data = compatibility.with_index_names(data, queryset.level_of_analysis.name)
         bytes_buffer = io.BytesIO()
         data.to_parquet(bytes_buffer,compression="gzip")
         return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")

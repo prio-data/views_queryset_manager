@@ -39,9 +39,9 @@ class Theme(Base, GocMixin):
 
     Columns
     -------
-    name        = str
-    description = str
-    querysets   = foreign key many-to-many -> Queryset
+    name:         str
+    description:  str
+    querysets:    foreign key many-to-many -> Queryset
     """
 
     __tablename__ = "theme"
@@ -70,7 +70,9 @@ class LevelOfAnalysis(Base, GocMixin):
     name: str
     """
     __tablename__ = "level_of_analysis"
-    name = Column(String, primary_key = True)
+
+    name        = Column(String, primary_key = True)
+    queryset    = relationship("Queryset", back_populates = "level_of_analysis", cascade = "all,delete-orphan")
 
 class Queryset(Base):
     """
@@ -81,34 +83,29 @@ class Queryset(Base):
 
     Columns
     -------
-    name:              str
-    level_of_analysis: str, many-to-one foreign key -> LevelOfAnalysis.name
-    description:       str, optional
-    themes:            List[Theme], one-to-many foreign key
-    operation_roots:   List[Operation], one-to-many foreign key
+    name:                 str
+    level_of_analysis_id: str, many-to-one foreign key -> LevelOfAnalysis.name
+    description:          str, optional
+    themes:               List[Theme], one-to-many foreign key
+    operation_roots:      List[Operation], one-to-many foreign key
 
     """
     __tablename__ = "queryset"
 
-    name              = Column(String,primary_key=True)
-    level_of_analysis = Column(String, ForeignKey("level_of_analysis.name"))
-    description       = Column(String, nullable = True)
-    themes            = relationship("Theme",
-                            secondary = querysets_themes,
-                            back_populates = "querysets",
-                            )
-    operation_roots   = relationship(
-                            "Operation",
-                            cascade="all,delete-orphan"
-                            )
+    name                 = Column(String,primary_key=True)
+    level_of_analysis_id = Column(String, ForeignKey("level_of_analysis.name"))
+    level_of_analysis    = relationship("LevelOfAnalysis")
+    description          = Column(String, nullable = True)
+    themes               = relationship("Theme", secondary = querysets_themes, back_populates = "querysets")
+    operation_roots      = relationship("Operation", cascade="all,delete-orphan")
 
     @classmethod
     def from_pydantic(cls, session, queryset_model):
         queryset = cls(
-                name = queryset_model.name,
+                name              = queryset_model.name,
                 level_of_analysis = LevelOfAnalysis.get_or_create(session, queryset_model.loa),
-                description = queryset_model.description,
-                themes = [Theme.get_or_create(session,th) for th in queryset_model.themes]
+                description       = queryset_model.description,
+                themes            = [Theme.get_or_create(session,th) for th in queryset_model.themes]
             )
 
         for chain in queryset_model.operations:
@@ -125,11 +122,11 @@ class Queryset(Base):
 
     def dict(self):
         return {
-            "name": self.name,
-            "loa": self.level_of_analysis.name,
+            "name":        self.name,
+            "loa":         self.level_of_analysis.name,
             "description": self.description,
-            "themes": [th.name for th in self.themes],
-            "operations": [[op.dict() for op in ch] for ch in self.op_chains()]
+            "themes":      [th.name for th in self.themes],
+            "operations":  [[op.dict() for op in ch] for ch in self.op_chains()]
         }
 
     def path(self):
@@ -145,13 +142,13 @@ class Operation(Base):
 
     Columns
     -------
-    operation_id      : int
-    name              : str
-    namespace         : RemoteNamespaces
-    arguments         : Any
-    queryset_name     : str, foreign key many-to-one -> Queryset
+    operation_id:       int
+    name:               str
+    namespace:          RemoteNamespaces
+    arguments:          Any
+    queryset_name:      str, foreign key many-to-one -> Queryset
 
-    next_operation_id : int, foreign key one-to-one -> Operation
+    next_operation_id:  int, foreign key one-to-one -> Operation
     """
     __tablename__ = "operation"
 
@@ -178,7 +175,7 @@ class Operation(Base):
     def dict(self):
         return {
             "namespace": self.namespace.value,
-            "name": self.name,
+            "name":      self.name,
             "arguments": self.arguments,
             }
 
@@ -198,7 +195,7 @@ class Operation(Base):
 
     def get_chain(self,previous=None):
         if previous is None:
-            previous = [] 
+            previous = []
         previous.append(self)
         if self.next_operation:
             return self.next_operation.get_chain(previous=previous)
