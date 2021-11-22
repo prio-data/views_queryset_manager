@@ -11,4 +11,7 @@ DB_USER                    = env.str("QUERYSET_MANAGER_DB_USER", "postgres")
 DB_SCHEMA: Optional[str]   = env.str("QUERYSET_MANAGER_DB_SCHEMA", None)
 DB_PASSWORD: Optional[str] = env.str("QUERYSET_MANAGER_DB_PASSWORD", None)
 DB_SSL                     = env.str("QUERYSET_MANAGER_DB_SSL", "allow")
+
 LOG_LEVEL                  = env.str("LOG_LEVEL", "WARNING")
+
+JOB_MANAGER_URL            = env.str("JOB_MANAGER_URL", "http://job-manager")

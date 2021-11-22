@@ -16,7 +16,7 @@ from . import crud,models,db,remotes,settings,retrieval,compatibility
 logger = logging.getLogger(__name__)
 
 try:
-    logging.basicConfig(level=getattr(logging,settings.config("LOG_LEVEL")))
+    logging.basicConfig(level=getattr(logging,settings.LOG_LEVEL))
 except AttributeError:
     pass
 
@@ -35,7 +35,7 @@ def get_session():
         sess.close()
 
 remotes_api = remotes.Api(
-        source_url = os.path.join(settings.config("JOB_MANAGER_URL"),"job")
+        source_url = os.path.join(settings.JOB_MANAGER_URL,"job")
         )
 
 @app.get("/")
