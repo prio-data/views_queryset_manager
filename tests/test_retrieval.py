@@ -40,12 +40,14 @@ class TestRetrieval(TestCase):
         self.assertTrue(res.is_left())
         self.assertIs(type(error),retrieval.HTTPNotOk)
 
+    """
     @patch("queryset_manager.retrieval.get", bad_request_gibberish)
     def test_gibberish(self):
         res = asyncio.run(retrieval.fetch_set("http://",MockQueryset(["foo"])))
         error = res.either(identity,identity)[0]
         self.assertTrue(res.is_left())
         self.assertIs(type(error),retrieval.DeserializationError)
+        """
 
     @patch("queryset_manager.retrieval.get", test_success)
     def test_success(self):

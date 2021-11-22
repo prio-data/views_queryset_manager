@@ -12,12 +12,14 @@ Querysets can be CRUDed, and are organized into Themes.
 
 |Key                                                          |Description                    |Default                      |
 |-------------------------------------------------------------|-------------------------------|-----------------------------|
-|DB_HOST                                                      |                               |                             |
-|DB_PORT                                                      |                               |                             |
-|DB_USER                                                      |                               |                             |
-|DB_NAME                                                      |                               |                             |
-|LOG_LEVEL                                                    |                               |                             |
-|JOB_MANAGER_URL                                              |                               |                             |
+|DB_HOST                                                      |database hostname              |127.0.0.1                    |
+|DB_PORT                                                      |port for database connnection. |5432                         |
+|DB_USER                                                      |user for database connection.  |postgres                     |
+|DB_NAME                                                      |dbname for database connection.|postgres                     |
+|DB_PASSWORD                                                  |Optional password for database |None                         |
+|DB_SSL                                                       |sslmode for database           |allow                        |
+|LOG_LEVEL                                                    |Python logging level           |WARNING                      |
+|JOB_MANAGER_URL                                              |URL for upstream data source   |http://job-manager           |
 
 ## Depends on 
 

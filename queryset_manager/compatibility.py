@@ -13,10 +13,11 @@ def with_index_names(df: pd.DataFrame, loa: str)-> pd.DataFrame:
     index_names = {
             "priogrid_month": ("month_id", "pg_id"),
             "country_month": ("month_id", "country_id"),
+            "country_year": ("year_id", "country_id"),
         }
 
     try:
-        names = index_names[loa.value.lower()]
+        names = index_names[loa.lower()]
     except KeyError:
         names = ("time","unit")
     df.index.names = names

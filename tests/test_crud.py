@@ -17,26 +17,26 @@ class TestCrud(TestCase):
 
     def test_create(self):
         queryset = views_schema.Queryset(
-                name = "my_queryset",
-                loa = "country_month",
+                name   = "my_queryset",
+                loa    = "country_month",
                 themes = ["my_theme","my_other_theme"],
                 operations = [
                         [
                             views_schema.Operation(
                                 namespace = "trf",
-                                name="operation.my_transform",
-                                arguments=[10],
+                                name      = "operation.my_transform",
+                                arguments = [10],
                                 ),
                             views_schema.Operation(
                                 namespace = "base",
-                                name = "priogrid_month.my_variable",
+                                name      = "priogrid_month.my_variable",
                                 arguments = ["max"]
                                 )
                         ],
                         [
                             views_schema.Operation(
                                 namespace = "base",
-                                name = "country_month.my_variable",
+                                name      = "country_month.my_variable",
                                 arguments = ["values"]
                                 )
                         ],

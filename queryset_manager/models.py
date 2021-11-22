@@ -13,37 +13,7 @@ querysets_themes = Table("querysets_themes", Base.metadata,
         Column("queryset_name", String, ForeignKey("queryset.name"))
     )
 
-class RemoteNamespaces(enum.Enum):
-    """
-    An enum representing the available alternatives for remote namespaces.
-    """
-    trf="trf"
-    base="base"
-
-class RemoteLOAs(enum.Enum):
-    """
-    An enum representing the available levels of analysis.
-    """
-    priogrid_month="priogrid_month"
-    country_month = "country_month"
-
-class Theme(Base):
-    __tablename__ = "theme"
-
-    name = Column(String,primary_key=True)
-    description = Column(String, nullable=True)
-
-    querysets = relationship("Queryset",
-            secondary = querysets_themes,
-            back_populates = "themes"
-            )
-
-    def path(self):
-        return "theme/"+self.name
-
-    def __repr__(self):
-        return f"{self.name} ({len(self.querysets)} querysets)"
-
+class GocMixin():
     @classmethod
     def get_or_create(cls, session, identifier, identifier_name = "name"):
         existing = session.query(cls).get(identifier)
@@ -53,31 +23,89 @@ class Theme(Base):
 
         return cls(**{identifier_name: identifier})
 
+class RemoteNamespaces(enum.Enum):
+    """
+    An enum representing the available alternatives for remote namespaces.
+    """
+    trf="trf"
+    base="base"
+
+class Theme(Base, GocMixin):
+    """
+    Theme
+    =====
+    A theme is an organizational concept for querysets, letting you group
+    querysets by attaching labels to them.
+
+    Columns
+    -------
+    name:         str
+    description:  str
+    querysets:    foreign key many-to-many -> Queryset
+    """
+
+    __tablename__ = "theme"
+
+    name        = Column(String,primary_key=True)
+    description = Column(String, nullable=True)
+    querysets   = relationship("Queryset",
+                        secondary = querysets_themes,
+                        back_populates = "themes"
+                    )
+
+    def path(self):
+        return "theme/"+self.name
+
+    def __repr__(self):
+        return f"{self.name} ({len(self.querysets)} querysets)"
+
+class LevelOfAnalysis(Base, GocMixin):
+    """
+    LevelOfAnalysis
+    ===============
+    A level-of-analysis entry. This table is automatically populated when a queryset is created.
+
+    Columns
+    -------
+    name: str
+    """
+    __tablename__ = "level_of_analysis"
+
+    name        = Column(String, primary_key = True)
+    queryset    = relationship("Queryset", back_populates = "level_of_analysis", cascade = "all,delete-orphan")
+
 class Queryset(Base):
+    """
+    Queryset
+    ========
+    A queryset is a collection of operation-chains that result in data-columns
+    at a certain level of analysis.
+
+    Columns
+    -------
+    name:                 str
+    level_of_analysis_id: str, many-to-one foreign key -> LevelOfAnalysis.name
+    description:          str, optional
+    themes:               List[Theme], one-to-many foreign key
+    operation_roots:      List[Operation], one-to-many foreign key
+
+    """
     __tablename__ = "queryset"
 
-    name = Column(String,primary_key=True)
-    loa = Column(Enum(RemoteLOAs),nullable=False)
-
-    description = Column(String, nullable = True)
-
-    themes = relationship("Theme",
-            secondary = querysets_themes,
-            back_populates = "querysets",
-            )
-
-    operation_roots = relationship(
-            "Operation",
-            cascade="all,delete-orphan"
-            )
+    name                 = Column(String,primary_key=True)
+    level_of_analysis_id = Column(String, ForeignKey("level_of_analysis.name"))
+    level_of_analysis    = relationship("LevelOfAnalysis")
+    description          = Column(String, nullable = True)
+    themes               = relationship("Theme", secondary = querysets_themes, back_populates = "querysets")
+    operation_roots      = relationship("Operation", cascade="all,delete-orphan")
 
     @classmethod
     def from_pydantic(cls, session, queryset_model):
         queryset = cls(
-                name = queryset_model.name,
-                loa = RemoteLOAs(queryset_model.loa),
-                description = queryset_model.description,
-                themes = [Theme.get_or_create(session,th) for th in queryset_model.themes]
+                name              = queryset_model.name,
+                level_of_analysis = LevelOfAnalysis.get_or_create(session, queryset_model.loa),
+                description       = queryset_model.description,
+                themes            = [Theme.get_or_create(session,th) for th in queryset_model.themes]
             )
 
         for chain in queryset_model.operations:
@@ -86,10 +114,7 @@ class Queryset(Base):
         return queryset
 
     def paths(self):
-        try:
-            loa = self.loa.value
-        except AttributeError:
-            loa = str(self.loa)
+        loa = self.level_of_analysis.name
         return [os.path.join(loa,op.operation_chain_path()) for op in self.operation_roots]
 
     def op_chains(self):
@@ -97,11 +122,11 @@ class Queryset(Base):
 
     def dict(self):
         return {
-            "name": self.name,
-            "loa": self.loa.value,
+            "name":        self.name,
+            "loa":         self.level_of_analysis.name,
             "description": self.description,
-            "themes": [th.name for th in self.themes],
-            "operations": [[op.dict() for op in ch] for ch in self.op_chains()]
+            "themes":      [th.name for th in self.themes],
+            "operations":  [[op.dict() for op in ch] for ch in self.op_chains()]
         }
 
     def path(self):
@@ -109,9 +134,37 @@ class Queryset(Base):
 
 class Operation(Base):
     """
+    Operation
+    =========
+
     An op is an edge in a chain, corresponding to a remote path that represents
     a series of operations.
+
+    Columns
+    -------
+    operation_id:       int
+    name:               str
+    namespace:          RemoteNamespaces
+    arguments:          Any
+    queryset_name:      str, foreign key many-to-one -> Queryset
+
+    next_operation_id:  int, foreign key one-to-one -> Operation
     """
+    __tablename__ = "operation"
+
+    operation_id      = Column(Integer,primary_key=True)
+    name              = Column(String,nullable=False)
+    namespace         = Column(Enum(RemoteNamespaces),nullable=False)
+    arguments         = Column(JSON,)
+    queryset_name     = Column(String,ForeignKey("queryset.name"))
+
+    next_operation_id = Column(Integer,ForeignKey("operation.operation_id"))
+    next_operation    = relationship(
+                              "Operation",
+                              backref = "previous_operation",
+                              remote_side = [operation_id],
+                              cascade = "all,delete"
+                          )
 
     @classmethod
     def from_pydantic(cls,pydantic_model):
@@ -119,28 +172,10 @@ class Operation(Base):
         d["namespace"] = RemoteNamespaces(d["namespace"])
         return cls(**d)
 
-    __tablename__ = "operation"
-
-    operation_id = Column(Integer,primary_key=True)
-
-    next_operation_id = Column(Integer,ForeignKey("operation.operation_id"))
-    next_operation = relationship(
-            "Operation",
-            backref = "previous_operation",
-            remote_side = [operation_id],
-            cascade = "all,delete"
-        )
-
-    queryset_name = Column(String,ForeignKey("queryset.name"))
-
-    namespace = Column(Enum(RemoteNamespaces),nullable=False)
-    name = Column(String,nullable=False)
-    arguments = Column(JSON,)
-
     def dict(self):
         return {
             "namespace": self.namespace.value,
-            "name": self.name,
+            "name":      self.name,
             "arguments": self.arguments,
             }
 
@@ -160,7 +195,7 @@ class Operation(Base):
 
     def get_chain(self,previous=None):
         if previous is None:
-            previous = list()
+            previous = []
         previous.append(self)
         if self.next_operation:
             return self.next_operation.get_chain(previous=previous)

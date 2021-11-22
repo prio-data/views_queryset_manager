@@ -26,18 +26,18 @@ class TestModels(TestCase):
         Test operation chaining when creating ORM representation.
         """
         posted_model = views_schema.Queryset(
-                name = "my_test_queryset",
-                loa = "priogrid_month",
-                themes = ["foo","bar"],
+                name        = "my_test_queryset",
+                loa         = "priogrid_month",
+                themes      = ["foo","bar"],
                 description = "A description...",
                 operations = [
                     [
                         views_schema.TransformOperation(name = "my.transform",arguments = []),
-                        views_schema.DatabaseOperation(
-                            name = "table.column",arguments = ["values"]),
+                        views_schema.DatabaseOperation(name = "table.column",arguments = ["values"]),
                     ]
                 ]
             )
+
         orm_model = models.Queryset.from_pydantic(self.sess, posted_model)
 
         self.assertEqual(len(orm_model.op_chains()),1)
@@ -48,9 +48,9 @@ class TestModels(TestCase):
         Test serialization back and forth from ORM for equivalence
         """
         pydantic_model = views_schema.Queryset(
-                name = "pydantic_queryset",
-                loa = "priogrid_month",
-                themes = ["a","b"],
+                name        = "pydantic_queryset",
+                loa         = "priogrid_month",
+                themes      = ["a","b"],
                 description = "My great description",
                 operations = [
                     [
@@ -70,22 +70,22 @@ class TestModels(TestCase):
 
     def test_roundtrip(self):
         pydantic_model = views_schema.Queryset(
-                name = "send_me_to_db",
-                loa = "country_month",
-                themes = [":)"],
+                name        = "send_me_to_db",
+                loa         = "country_month",
+                themes      = [":)"],
                 description = "This is a queryset used for testing.",
                 operations = [
                     [
                         views_schema.TransformOperation(
-                            name = "alpha.beta", 
+                            name      = "alpha.beta",
                             arguments = ["1","2","3"]),
                         views_schema.DatabaseOperation(
-                            name = "my_table.my_column", 
+                            name      = "my_table.my_column",
                             arguments = ["values"])
                     ],
                     [
                         views_schema.DatabaseOperation(
-                            name = "another_table.something", 
+                            name      = "another_table.something",
                             arguments = ["values"])
                     ],
                 ]
@@ -93,5 +93,5 @@ class TestModels(TestCase):
 
         self.sess.add(models.Queryset.from_pydantic(self.sess,pydantic_model))
         retrieved = self.sess.query(models.Queryset).first()
-        reserialized = views_schema.Queryset(**retrieved.dict()) 
+        reserialized = views_schema.Queryset(**retrieved.dict())
         self.assertEqual(reserialized,pydantic_model)
