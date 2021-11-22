@@ -2,16 +2,21 @@
 import psycopg2
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .settings import config
+from . import settings
 
 def get_con():
-    return psycopg2.connect(
-            f"host={config('DB_HOST')} "
-            f"port={config('DB_PORT')} "
-            f"user={config('DB_USER')} "
-            f"dbname={config('DB_NAME')} "
-            f"sslmode=allow "
-        )
+    connection_parameters = [
+            f"host={settings.DB_HOST}",
+            f"port={settings.DB_PORT}",
+            f"user={settings.DB_USER}",
+            f"dbname={settings.DB_NAME}",
+            f"sslmode={settings.DB_SSL}",
+            ]
+
+    if settings.DB_PASSWORD:
+        connection_parameters.append("password={settings.DB_PASSWORD}")
+
+    return psycopg2.connect(" ".join(connection_parameters))
 
 engine = create_engine("postgresql+psycopg2://", creator = get_con)
 
