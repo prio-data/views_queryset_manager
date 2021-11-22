@@ -13,6 +13,16 @@ querysets_themes = Table("querysets_themes", Base.metadata,
         Column("queryset_name", String, ForeignKey("queryset.name"))
     )
 
+class GocMixin():
+    @classmethod
+    def get_or_create(cls, session, identifier, identifier_name = "name"):
+        existing = session.query(cls).get(identifier)
+
+        if existing is not None:
+            return existing
+
+        return cls(**{identifier_name: identifier})
+
 class RemoteNamespaces(enum.Enum):
     """
     An enum representing the available alternatives for remote namespaces.
@@ -20,7 +30,7 @@ class RemoteNamespaces(enum.Enum):
     trf="trf"
     base="base"
 
-class Theme(Base):
+class Theme(Base, GocMixin):
     """
     Theme
     =====
@@ -49,16 +59,7 @@ class Theme(Base):
     def __repr__(self):
         return f"{self.name} ({len(self.querysets)} querysets)"
 
-    @classmethod
-    def get_or_create(cls, session, identifier, identifier_name = "name"):
-        existing = session.query(cls).get(identifier)
-
-        if existing is not None:
-            return existing
-
-        return cls(**{identifier_name: identifier})
-
-class LevelOfAnalysis(Base):
+class LevelOfAnalysis(Base, GocMixin):
     """
     LevelOfAnalysis
     ===============
@@ -105,7 +106,7 @@ class Queryset(Base):
     def from_pydantic(cls, session, queryset_model):
         queryset = cls(
                 name = queryset_model.name,
-                level_of_analysis = LevelOfAnalysis(name = queryset_model.loa),
+                level_of_analysis = LevelOfAnalysis.get_or_create(session, queryset_model.loa),
                 description = queryset_model.description,
                 themes = [Theme.get_or_create(session,th) for th in queryset_model.themes]
             )
