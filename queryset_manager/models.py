@@ -105,7 +105,7 @@ class Queryset(Base):
     def from_pydantic(cls, session, queryset_model):
         queryset = cls(
                 name = queryset_model.name,
-                loa = LevelOfAnalysis(name = queryset_model.loa),
+                level_of_analysis = LevelOfAnalysis(name = queryset_model.loa),
                 description = queryset_model.description,
                 themes = [Theme.get_or_create(session,th) for th in queryset_model.themes]
             )

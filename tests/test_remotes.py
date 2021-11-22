@@ -18,7 +18,7 @@ class TestRemotes(unittest.TestCase):
 
         test_queryset = models.Queryset(
                 name="My qs",
-                loa="priogrid_month",
+                level_of_analysis = models.LevelOfAnalysis(name = "priogrid_month"),
                 operation_roots = [
                     models.Operation(
                         namespace = models.RemoteNamespaces("trf"),
