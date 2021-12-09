@@ -86,6 +86,34 @@ async def deserialize(request_result) -> pd.DataFrame:
     except OSError:
         return Left(DeserializationError(request_result.either(str,str)))
 
+def ensure_index_names(dataframes: List[pd.DataFrame])-> List[pd.DataFrame]:
+    """
+    ensure_index_names
+    ==================
+
+    parameters:
+        dataframes (List[pandas.DataFrame]): A list of doubly-indexed dataframes.
+    returns:
+        List[pandas.DataFrame]: A list of doubly-indexed dataframes with the same index names.
+
+    This function is run before merging, to ensure that dataframes all share index names.
+    This is done to smooth over some problems upstream.
+
+    #TODO fix this upstream!
+    """
+
+    all_names = {n for n in {tuple(df.index.names) for df in dataframes} if n != (None, None)}
+    if all_names:
+        names,*_ = all_names
+    else:
+        logger.warning("No index names found in list of dataframes, using fallback")
+        names = ("TIME", "UNIT")
+
+    for df in dataframes:
+        df.index.names = names
+
+    return dataframes
+
 async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
     async with aiohttp.ClientSession() as session:
         get_data = compose(
@@ -102,6 +130,8 @@ async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
         return Left(errors)
 
     results: List[pd.DataFrame] = rights(results)
+    results = ensure_index_names(results)
+
     results = list_with_distinct_names(results)
     df = reduce(lambda a,b: a.merge(b, left_index = True, right_index = True, how = "inner"), results)
     #df = fast_views.inner_join(results)
