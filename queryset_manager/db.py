@@ -14,7 +14,7 @@ def get_con():
             ]
 
     if settings.DB_PASSWORD:
-        connection_parameters.append("password={settings.DB_PASSWORD}")
+        connection_parameters.append(f"password={settings.DB_PASSWORD}")
 
     return psycopg2.connect(" ".join(connection_parameters))
 
