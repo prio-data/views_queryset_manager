@@ -1,139 +1,113 @@
 
-from typing import TypeVar, List, Any
-
+import json
+from typing import List
+import datetime
 import logging
 import asyncio
 from io import BytesIO
 from pymonad.either import Right, Left, Either
-from toolz.functoolz import compose, curry, reduce
+from pymonad.maybe import Maybe, Just, Nothing
+from toolz.functoolz import curry, reduce
 import aiohttp
 #import fast_views
+from pydantic import ValidationError
+from pyarrow.lib import ArrowInvalid
 import pandas as pd
-from . import models
-
-identity = lambda x:x
+from views_schema import viewser as schema
+from . import models, errors
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-
-class HTTPNotOk(Exception):
-    def __init__(self, url, status_code, content):
-        self.status_code = status_code
-        self.content = content
-        super().__init__(f"{url} returned {status_code} ({content})")
-
-class DeserializationError(Exception):
-    def __init__(self, bytes):
-        self.status_code = 500
-        super().__init__(f"Could not deserialize as parquet: {bytes}")
-
-class Pending(Exception):
-    def __init__(self,url):
-        self.status_code = 202
-        super().__init__(f"{url} is pending")
-
-def combine_either(left: bool, eithers):
-    extractors = (lambda x: list(), lambda x: [x])
-    extractors = extractors if not left else extractors[::-1]
-    return reduce(lambda a,b: a + b.either(*extractors), eithers, [])
-
-lefts, rights = (curry(combine_either, b) for b in (True, False))
-
-def distinguish_string(by, existing, new):
-    if new in existing:
-        return distinguish_string(by, existing, by(new))
-    else:
-        return new
-
-def concat_distinct(by, existing, new):
-    return existing + [distinguish_string(by, existing, new)]
-
-distinct_names = lambda names: reduce(
-        curry(concat_distinct, lambda s: "_"+s),
-        names,
-        [])
-
-def list_with_distinct_names(dfs: List[pd.DataFrame])-> List[pd.DataFrame]:
-
-    seen = []
-    for df in dfs:
-        seen_before = len(seen)
-        seen = distinct_names(seen + list(df.columns))
-        df.columns = seen[seen_before:]
-
-    return dfs
-
-
-async def get(session: aiohttp.ClientSession, url: str)->Either:
-    async with session.get(url) as response:
-        content = await response.content.read()
-        if (status := response.status) == 200:
-            return Right(content)
-        elif status == 202:
-            return Left(Pending(url))
-        else:
-            return Left(HTTPNotOk(url,status, content))
-
-def make_urls(base_url: str, queryset):
-    return [base_url + "/" + path for path in queryset.paths()]
-
-async def deserialize(request_result) -> pd.DataFrame:
-    request_result = await request_result
-    pd_from_bytes = lambda b: pd.read_parquet(BytesIO(b))
-    try:
-        return request_result.either(Left, lambda bytes: Right(pd_from_bytes(bytes)))
-    except OSError:
-        return Left(DeserializationError(request_result.either(str,str)))
-
-def ensure_index_names(dataframes: List[pd.DataFrame])-> List[pd.DataFrame]:
+async def queryset_responses(base_url: str, queryset: models.Queryset) -> List[models.Response]:
     """
-    ensure_index_names
+    queryset_responses
     ==================
-
-    parameters:
-        dataframes (List[pandas.DataFrame]): A list of doubly-indexed dataframes.
-    returns:
-        List[pandas.DataFrame]: A list of doubly-indexed dataframes with the same index names.
-
-    This function is run before merging, to ensure that dataframes all share index names.
-    This is done to smooth over some problems upstream.
-
-    #TODO fix this upstream!
     """
+    def make_urls(base_url: str, queryset):
+        return [base_url + "/" + path for path in queryset.paths()]
 
-    all_names = {n for n in {tuple(df.index.names) for df in dataframes} if n != (None, None)}
-    if all_names:
-        names,*_ = all_names
-    else:
-        logger.warning("No index names found in list of dataframes, using fallback")
-        names = ("TIME", "UNIT")
+    async def get(session: aiohttp.ClientSession, url: str) -> models.Response:
+        async with session.get(url) as response:
+            content = await response.content.read()
+            return models.Response(content = content, status_code = response.status)
 
-    for df in dataframes:
-        df.index.names = names
-
-    return dataframes
-
-async def fetch_set(base_url: str, queryset: models.Queryset)-> Either:
     async with aiohttp.ClientSession() as session:
-        get_data = compose(
-                deserialize,
-                curry(get,session),
-            )
+        results = await asyncio.gather(*map(curry(get, session), make_urls(base_url, queryset)))
 
-        results = await asyncio.gather(
-                *map(get_data, make_urls(base_url, queryset))
-            )
+    return results
 
-    errors = lefts(results)
-    if errors:
-        return Left(errors)
+def data_response(responses: List[models.Response]) -> models.Response:
+    """
+    data_response
+    =============
+    """
+    return (deserialize_data(responses)
+        .then(merge_data)
+        .maybe(
+            models.Response(content = "Failed to deserialize data from upstream response", status_code = 500),
+            dataframe_as_response))
 
-    results: List[pd.DataFrame] = rights(results)
-    results = ensure_index_names(results)
+def deserialize_data(responses: List[models.Response]) -> Maybe[List[pd.DataFrame]]:
+    """
+    deserialize_data
+    ================
+    """
+    try:
+        return Just(map(lambda rsp: pd.read_parquet(BytesIO(rsp.content)), responses))
+    except (OSError, ArrowInvalid):
+        logger.critical("Failed to deserialize data from upstream.")
+        return Nothing
 
-    results = list_with_distinct_names(results)
-    df = reduce(lambda a,b: a.merge(b, left_index = True, right_index = True, how = "inner"), results)
-    #df = fast_views.inner_join(results)
+def merge_data(dataframes: List[pd.DataFrame]) -> Maybe[pd.DataFrame]:
+    """
+    merge_data
+    ==========
+    """
+    try:
+        return Just(reduce(lambda a,b: a.merge(b, left_index = True, right_index = True, how = "inner"), dataframes))
+    except Exception as e:
+        logger.critical(f"Failed to join data due to exception: {str(e)}.")
+        return Nothing
 
-    return Right(df)
+def dataframe_as_response(dataframe: pd.DataFrame) -> models.Response:
+    """
+    dataframe_as_response
+    =====================
+    """
+    buf = BytesIO()
+    dataframe.to_parquet(buf)
+    return models.Response(content = buf.getvalue(), status_code = 200)
+
+def error_response(responses: List[models.Response]) -> models.Response:
+    """
+    error_response
+    ==============
+    """
+    messages = []
+    for response in responses:
+        try:
+            propagated = schema.Dump(**json.loads(response.content))
+            messages += propagated.messages
+        except ValidationError:
+            try:
+                messages += errors.DEFAULT_ERROR_MESSAGES[response.status_code]
+            except KeyError:
+                messages += schema.Message(
+                        content = response.content.decode())
+
+    error_dump = schema.Dump(
+            title = "Queryset manager had an issue.",
+            timestamp = datetime.datetime.now(),
+            messages = messages)
+
+    return models.Response(
+            status_code = max([rsp.status_code for rsp in responses]),
+            content = error_dump.json())
+
+def check_for_errors(responses: List[models.Response]) -> Either[List[models.Response], List[models.Response]]:
+    """
+    check_for_errors
+    ================
+    """
+    error_responses = [rsp for rsp in responses if rsp.status_code != 200]
+    return Left(error_responses) if error_responses else Right(responses)

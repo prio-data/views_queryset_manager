@@ -1,6 +1,9 @@
 import os
 import enum
 from typing import List
+from pydantic import BaseModel, ValidationError
+from pymonad.maybe import Just, Nothing, Maybe
+from views_schema import viewser as schema
 from sqlalchemy import Column,String,Enum,Integer,ForeignKey,JSON,MetaData,Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship,validates
@@ -245,3 +248,14 @@ def chain_operations(operations: List[Operation])-> Operation:
         prev = op
 
     return first
+
+class Response(BaseModel):
+    status_code: int
+    content: bytes
+
+    @property
+    def error_dump(self) -> Maybe[schema.Dump]:
+        try:
+            return Just(schema.Dump(**json.loads(self.content)))
+        except ValidationError:
+            return Nothing

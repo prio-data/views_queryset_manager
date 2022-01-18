@@ -4,12 +4,13 @@ from typing import Optional, List
 import io
 from datetime import date
 
+from pymonad.either import Left
 from fastapi import Response, Depends
 from fastapi.responses import JSONResponse
 import fastapi
 import pandas as pd
-from requests import HTTPError
 import views_schema as schema
+from views_schema import viewser as viewser_schema
 
 from . import crud,models,db,remotes,settings,retrieval,compatibility
 
@@ -38,15 +39,6 @@ remotes_api = remotes.Api(
         source_url = os.path.join(settings.JOB_MANAGER_URL,"job")
         )
 
-@app.get("/")
-def handshake():
-    """
-    Returns information about the app, including which version of viewser it expects.
-    """
-    return JSONResponse({
-            "viewser_version": "3.0.0"
-        })
-
 @app.get("/data/{queryset_name}")
 async def queryset_data(
         queryset_name:str,
@@ -60,22 +52,13 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    def make_error_response(errors: List[Exception]):
-        msg = "\n".join([str(e) for e in errors])
-        if {type(e) for e in errors} == {retrieval.Pending}:
-            status_code = 202
-        else:
-            status_code = max([e.status_code for e in errors])
-        return Response(msg, status_code)
+    responses = await retrieval.queryset_responses(remotes_api.source_url, queryset)
+    response = (responses.maybe(Left([models.Response(content = "", status_code = 502)]), retrieval.check_for_errors)
+        .either(
+            retrieval.error_response,
+            retrieval.data_response))
 
-    def make_data_response(data: pd.DataFrame):
-        data = compatibility.with_index_names(data, queryset.level_of_analysis.name)
-        bytes_buffer = io.BytesIO()
-        data.to_parquet(bytes_buffer,compression="gzip")
-        return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
-
-    result = await retrieval.fetch_set(remotes_api.source_url, queryset)
-    return result.either(make_error_response, make_data_response)
+    return Response(response.content, status_code = response.status_code)
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
@@ -85,7 +68,7 @@ def queryset_detail(queryset:str, session = Depends(get_session)):
 
     queryset = session.query(models.Queryset).get(queryset)
     if queryset is None:
-        return fastapi.Response(status_code=404)
+        return fastapi.Response(status_code = 404)
     return queryset.dict()
 
 @app.get("/querysets")
@@ -181,4 +164,15 @@ def theme_detail(theme:str, session = Depends(get_session)):
             "description": theme.description if theme.description is not None else "",
 
             "querysets": [qs.name for qs in theme.querysets]
+        })
+
+@app.get("/")
+def handshake():
+    """
+    Returns information about the app, including which version of viewser it expects.
+
+    Deprecated
+    """
+    return JSONResponse({
+            "viewser_version": "5.x.x"
         })
