@@ -1,4 +1,5 @@
 import os
+import aiohttp
 import logging
 from typing import Optional, List
 import io
@@ -11,7 +12,7 @@ import pandas as pd
 from requests import HTTPError
 import views_schema as schema
 
-from . import crud,models,db,remotes,settings,retrieval,compatibility
+from . import crud,models,db,remotes,settings,retrieval,compatibility, data_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -60,22 +61,11 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    def make_error_response(errors: List[Exception]):
-        msg = "\n".join([str(e) for e in errors])
-        if {type(e) for e in errors} == {retrieval.Pending}:
-            status_code = 202
-        else:
-            status_code = max([e.status_code for e in errors])
-        return Response(msg, status_code)
-
-    def make_data_response(data: pd.DataFrame):
-        data = compatibility.with_index_names(data, queryset.level_of_analysis.name)
-        bytes_buffer = io.BytesIO()
-        data.to_parquet(bytes_buffer,compression="gzip")
-        return Response(bytes_buffer.getvalue(),media_type="application/octet-stream")
-
-    result = await retrieval.fetch_set(remotes_api.source_url, queryset)
-    return result.either(make_error_response, make_data_response)
+    with aiohttp.ClientSession() as http_session:
+        retriever = data_retriever.DataRetriever(
+                settings.JOB_MANAGER_URL+"/job",
+                http_session)
+        return Response(*retriever.queryset_data_response(queryset))
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
