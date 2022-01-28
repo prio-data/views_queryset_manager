@@ -19,8 +19,12 @@ class ResponseResult():
         return self.status_code == 202
 
     @property
+    def ok(self) -> bool:
+        return str(self.status_code)[0] == "2"
+
+    @property
     def error_dump(self) -> Maybe[schema.Dump]:
-        if str(self.status_code)[0] == "2":
+        if self.ok:
             return Nothing
         else:
             return Just(schema.Dump())
@@ -33,7 +37,7 @@ class ResponseResult():
 
         Maybe a pandas dataframe, if deserializable.
         """
-        if self.status_code:
+        if self.status_code == 200:
             return self._pd_from_bytes(self.content)
         else:
             return Nothing
@@ -43,3 +47,9 @@ class ResponseResult():
             return Just(pd.read_parquet(io.BytesIO(data)))
         except Exception:
             return Nothing
+
+    def __str__(self):
+        return f"ResponseResult(status_code = {self.status_code}, content = \"{self.content}\")"
+
+    def __repr__(self):
+        return str(self)

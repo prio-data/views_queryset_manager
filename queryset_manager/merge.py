@@ -6,29 +6,6 @@ from toolz.functoolz import compose, reduce, curry
 
 logger = logging.getLogger(__name__)
 
-def distinguish_string(by, existing, new):
-    if new in existing:
-        return distinguish_string(by, existing, by(new))
-    else:
-        return new
-
-def concat_distinct(by, existing, new):
-    return existing + [distinguish_string(by, existing, new)]
-
-distinct_names = lambda names: reduce(
-        curry(concat_distinct, lambda s: "_"+s),
-        names,
-        [])
-
-def list_with_distinct_names(dfs: List[pd.DataFrame])-> List[pd.DataFrame]:
-    seen = []
-    for df in dfs:
-        seen_before = len(seen)
-        seen = distinct_names(seen + list(df.columns))
-        df.columns = seen[seen_before:]
-    return dfs
-
-
 def pandas_merge(dataframes: List[pd.DataFrame])-> Maybe[pd.DataFrame]:
     """
     pandas_merge
@@ -46,6 +23,28 @@ def pandas_merge(dataframes: List[pd.DataFrame])-> Maybe[pd.DataFrame]:
     except pd.errors.MergeError:
         return Nothing
 
+def list_with_distinct_names(dfs: List[pd.DataFrame])-> List[pd.DataFrame]:
+    seen = []
+    for df in dfs:
+        seen_before = len(seen)
+        seen = distinct_names(seen + list(df.columns))
+        df.columns = seen[seen_before:]
+    return dfs
+
+def distinguish_string(by, existing, new):
+    if new in existing:
+        return distinguish_string(by, existing, by(new))
+    else:
+        return new
+
+def concat_distinct(by, existing, new):
+    return existing + [distinguish_string(by, existing, new)]
+
+distinct_names = lambda names: reduce(
+        curry(concat_distinct, lambda s: "_"+s),
+        names,
+        [])
+
 def ensure_index_names(dataframes: List[pd.DataFrame])-> List[pd.DataFrame]:
     """
     ensure_index_names
@@ -58,8 +57,6 @@ def ensure_index_names(dataframes: List[pd.DataFrame])-> List[pd.DataFrame]:
 
     This function is run before merging, to ensure that dataframes all share index names.
     This is done to smooth over some problems upstream.
-
-    #TODO fix this upstream!
     """
 
     all_names = {n for n in {tuple(df.index.names) for df in dataframes} if n != (None, None)}
@@ -79,4 +76,3 @@ merge = compose(
             list_with_distinct_names,
             ensure_index_names,
         )
-

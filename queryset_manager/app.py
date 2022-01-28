@@ -1,18 +1,15 @@
 import os
-import aiohttp
 import logging
-from typing import Optional, List
-import io
+from typing import Optional
 from datetime import date
 
 from fastapi import Response, Depends
 from fastapi.responses import JSONResponse
 import fastapi
-import pandas as pd
-from requests import HTTPError
 import views_schema as schema
+import aiohttp
 
-from . import crud,models,db,remotes,settings,retrieval,compatibility, data_retriever
+from . import crud, models, db, remotes, settings, data_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +58,12 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    with aiohttp.ClientSession() as http_session:
+    async with aiohttp.ClientSession() as http_session:
         retriever = data_retriever.DataRetriever(
                 settings.JOB_MANAGER_URL+"/job",
                 http_session)
-        return Response(*retriever.queryset_data_response(queryset))
+        status_code, content = await retriever.queryset_data_response(queryset)
+        return Response(content, status_code = status_code)
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
