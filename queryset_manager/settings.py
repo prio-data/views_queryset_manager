@@ -14,4 +14,4 @@ DB_SSL                     = env.str("QUERYSET_MANAGER_DB_SSL", "allow")
 
 LOG_LEVEL                  = env.str("LOG_LEVEL", "WARNING")
 
-JOB_MANAGER_URL            = env.str("JOB_MANAGER_URL", "http://job-manager")
+XFORM_URL                  = env.str("XFORM_URL", "http://xform")

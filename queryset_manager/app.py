@@ -58,12 +58,16 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    async with aiohttp.ClientSession() as http_session:
-        retriever = data_retriever.DataRetriever(
-                settings.JOB_MANAGER_URL+"/job",
-                http_session)
-        status_code, content = await retriever.queryset_data_response(queryset)
-        return Response(content, status_code = status_code)
+    response = requests.get(settings.XFORM_URL, json=queryset.dict())
+
+    return response
+
+#    async with aiohttp.ClientSession() as http_session:
+#        retriever = data_retriever.DataRetriever(
+#                settings.JOB_MANAGER_URL+"/job",
+#                http_session)
+#        status_code, content = await retriever.queryset_data_response(queryset)
+#        return Response(content, status_code = status_code)
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):
