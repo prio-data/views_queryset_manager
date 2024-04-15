@@ -72,7 +72,8 @@ class DataRetriever():
 
     def _url_from_path(self, path: str) -> str:
         """
-        _url
+        _url_from_path
+
         ====
 
         parameters:
