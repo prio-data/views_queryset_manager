@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 import fastapi
 import views_schema as schema
 import aiohttp
+import requests
 
 from . import crud, models, db, remotes, settings, data_retriever
 
@@ -32,10 +33,6 @@ def get_session():
     finally:
         sess.close()
 
-remotes_api = remotes.Api(
-        source_url = os.path.join(settings.JOB_MANAGER_URL,"job")
-        )
-
 @app.get("/")
 def handshake():
     """
@@ -58,12 +55,39 @@ async def queryset_data(
     if queryset is None:
         return Response(status_code=404)
 
-    async with aiohttp.ClientSession() as http_session:
-        retriever = data_retriever.DataRetriever(
-                settings.JOB_MANAGER_URL+"/job",
-                http_session)
-        status_code, content = await retriever.queryset_data_response(queryset)
-        return Response(content, status_code = status_code)
+    full_qs_dict = queryset.dict()
+
+    qs_dict={}
+    qs_dict['name'] = full_qs_dict['name']
+    qs_dict['to_loa'] = full_qs_dict['loa']
+    qs_paths = []
+    operations = full_qs_dict['operations']
+    for operation_path in operations:
+        path = ''
+        for operation in operation_path:
+            path = path + '/' + operation['namespace']
+            path = path + '/' + operation['name']
+            args = operation['arguments']
+            if len(args) == 0:
+                path = path + '/_'
+#            elif len(args) == 1:
+#                path = path + '/' + args[0]
+            else:
+                path = path + '/'
+                for arg in args:
+                    path = path + arg + '__'
+                path = path[:-2]
+        qs_paths.append(path)
+    qs_dict['paths'] = qs_paths
+
+    logger.debug("dict %s", qs_dict)
+
+    response = requests.get(settings.DATA_SERVICE_URL+'/queryset/', json=qs_dict)
+
+    content = response.content
+    status_code = response.status_code
+
+    return Response(content, status_code=status_code)
 
 @app.get("/querysets/{queryset}")
 def queryset_detail(queryset:str, session = Depends(get_session)):

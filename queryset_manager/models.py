@@ -189,7 +189,7 @@ class Operation(Base):
             args = ["_"]
         else:
             args = self.arguments
-        components.append("_".join([str(a) for a in args]))
+        components.append("__".join([str(a) for a in args]))
 
         return os.path.join(*components)
 
