@@ -11,7 +11,8 @@ import pandas as pd
 import requests
 from requests.exceptions import HTTPError
 
-from . import models, ops
+import models
+import ops
 
 logger = logging.getLogger(__name__)
 

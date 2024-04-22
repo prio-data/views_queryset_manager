@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 
-from . import constants 
+import constants
 
 logger = logging.getLogger(__name__)
 

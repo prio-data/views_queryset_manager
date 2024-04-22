@@ -10,7 +10,12 @@ import views_schema as schema
 import aiohttp
 import requests
 
-from . import crud, models, db, remotes, settings, data_retriever
+import crud
+import models
+import db
+import remotes
+import settings
+import data_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -33,31 +38,10 @@ def get_session():
     finally:
         sess.close()
 
-@app.get("/")
-def handshake():
-    """
-    Returns information about the app, including which version of viewser it expects.
-    """
-    return JSONResponse({
-            "viewser_version": "3.0.0"
-        })
-
-@app.get("/data/{queryset_name}")
-async def queryset_data(
-        queryset_name:str,
-        start_date:Optional[date]=None, end_date:Optional[date]=None,
-        session = Depends(get_session)):
-    """
-    Retrieve data corresponding to a queryset
-    """
-    queryset = crud.get_queryset(session,queryset_name)
-
-    if queryset is None:
-        return Response(status_code=404)
-
+def get_queryset_dict(queryset):
     full_qs_dict = queryset.dict()
 
-    qs_dict={}
+    qs_dict = {}
     qs_dict['name'] = full_qs_dict['name']
     qs_dict['to_loa'] = full_qs_dict['loa']
     qs_paths = []
@@ -70,8 +54,6 @@ async def queryset_data(
             args = operation['arguments']
             if len(args) == 0:
                 path = path + '/_'
-#            elif len(args) == 1:
-#                path = path + '/' + args[0]
             else:
                 path = path + '/'
                 for arg in args:
@@ -80,9 +62,38 @@ async def queryset_data(
         qs_paths.append(path)
     qs_dict['paths'] = qs_paths
 
+    return qs_dict
+
+@app.get("/")
+def handshake():
+    """
+    Returns information about the app, including which version of viewser it expects.
+    """
+    return JSONResponse({
+            "views queryset manager": "OK"
+        })
+
+@app.get("/data/{queryset_name}")
+async def queryset_data(
+        queryset_name:str,
+        start_date = 0, end_date = 0,
+        session = Depends(get_session)):
+    """
+    Retrieve data corresponding to a queryset
+    """
+
+    queryset = crud.get_queryset(session,queryset_name)
+
+    if queryset is None:
+        return Response(status_code=404)
+
+    qs_dict = get_queryset_dict(queryset)
+
     logger.debug("dict %s", qs_dict)
 
-    response = requests.get(settings.DATA_SERVICE_URL+'/queryset/', json=qs_dict)
+    url = f'{settings.DATA_SERVICE_URL}/queryset/{start_date}/{end_date}/'
+
+    response = requests.get(url, json=qs_dict)
 
     content = response.content
     status_code = response.status_code
@@ -145,6 +156,7 @@ def queryset_replace(
     """
     Replaces the queryset with the posted queryset
     """
+
     new.name = queryset
     return queryset_create(new, overwrite = True, session = session)
 
