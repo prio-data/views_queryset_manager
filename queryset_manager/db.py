@@ -2,7 +2,7 @@
 import psycopg2
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import settings
+from . import settings
 
 def get_con():
     connection_parameters = [

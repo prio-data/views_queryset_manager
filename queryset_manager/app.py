@@ -10,12 +10,12 @@ import views_schema as schema
 import aiohttp
 import requests
 
-import crud
-import models
-import db
-import remotes
-import settings
-import data_retriever
+from . import crud
+from . import models
+from . import db
+from . import remotes
+from . import settings
+from . import data_retriever
 
 logger = logging.getLogger(__name__)
 

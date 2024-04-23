@@ -17,9 +17,10 @@ from toolz.functoolz import reduce
 import aiohttp
 from views_schema import viewser as schema
 import pandas as pd
-import models
-import merge
-import response_result
+
+from . import models
+from . import merge
+from . import response_result
 
 logger = logging.getLogger(__name__)
 
