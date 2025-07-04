@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from toolz.functoolz import curry
 import views_schema
 
-from . import models
+import models
 
 class Exists(Exception):
     pass
